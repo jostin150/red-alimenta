@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE beneficiario ADD COLUMN comuna VARCHAR(60);
+
+COMMIT;
