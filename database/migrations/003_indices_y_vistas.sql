@@ -1,7 +1,7 @@
 BEGIN;
 
 -- ÍNDICES
--- Para escoger rápido los lotes que vencen primero (FEFO)
+-- Para escoger rápido los lotes que vencen primero (FiFO)
 CREATE INDEX idx_lote_fefo
   ON lote (id_categoria, fecha_vencimiento)
   WHERE estado = 'activo' AND saldo > 0;
@@ -13,7 +13,7 @@ CREATE INDEX idx_reserva_solicitud ON reserva (id_solicitud);
 CREATE INDEX idx_reserva_detalle_lote ON reserva_detalle (id_lote);
 CREATE INDEX idx_auditoria_tabla ON auditoria (tabla, fecha);
 
--- VISTA 1: inventario disponible
+--inventario disponible
 CREATE VIEW v_inventario_disponible AS
 SELECT l.id_lote,
        d.nombre AS donante,
@@ -33,14 +33,14 @@ WHERE l.estado = 'activo'
   AND l.saldo > 0
   AND l.fecha_vencimiento >= CURRENT_DATE;
 
--- VISTA 2: alertas de vencimiento (próximos 3 días)
+--alertas de vencimiento (próximos 3 días)
 CREATE VIEW v_alertas_vencimiento AS
 SELECT *
 FROM v_inventario_disponible
 WHERE dias_para_vencer <= 3
 ORDER BY fecha_vencimiento;
 
--- VISTA 3: historial de movimientos
+--historial de movimientos
 CREATE VIEW v_historial_movimientos AS
 SELECT m.id_movimiento,
        m.fecha,
@@ -57,7 +57,7 @@ JOIN lote l ON l.id_lote = m.id_lote
 JOIN unidad u ON u.id_unidad = l.id_unidad
 LEFT JOIN usuario us ON us.id_usuario = m.id_usuario;
 
--- VISTA 4: indicador mensual (donado, entregado, perdido)
+-- indicador mensual (donado, entregado, perdido)
 CREATE VIEW v_indicador_mensual AS
 SELECT date_trunc('month', m.fecha)::date AS mes,
        u.abreviatura AS unidad,
