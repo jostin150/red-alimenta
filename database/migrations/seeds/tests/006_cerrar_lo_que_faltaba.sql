@@ -11,3 +11,5 @@ INSERT INTO movimiento_inventario (id_lote, tipo, cantidad, motivo, fecha)
 SELECT id_lote, 'entrada', 8, 'Recepción de prueba', now() - interval '10 days'
 FROM nuevo
 RETURNING id_lote;
+
+CALL marcar_lotes_vencidos(2, 0);

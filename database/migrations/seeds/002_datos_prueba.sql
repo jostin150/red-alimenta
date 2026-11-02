@@ -3,7 +3,7 @@ BEGIN;
 
 SELECT setseed(0.42);
 
-
+-- 1. USUARIOS: 1 administrador, 2 gestores y 60 beneficiarios
 INSERT INTO usuario (nombre, correo, password_hash) VALUES
   ('Administrador Prueba', 'admin@alimenta.test',   'hash_de_prueba'),
   ('Gestor Uno',           'gestor1@alimenta.test', 'hash_de_prueba'),
