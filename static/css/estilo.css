@@ -1,10 +1,332 @@
-/* Estilo provisional y neutro: el diseño real llega en el paso 3 */
-body { font-family: system-ui, sans-serif; margin: 0; color: #222; }
-.barra { display: flex; gap: 2rem; align-items: center; padding: 1rem 2rem; border-bottom: 1px solid #ddd; }
-.marca { font-weight: 700; text-decoration: none; color: inherit; }
-nav a { margin-right: 1rem; }
-main { padding: 2rem; }
-.tabla-scroll { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; }
-th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #eee; }
-th { background: #f5f5f5; }
+/* ==========================================================
+   Red Alimenta Medellín · sistema de diseño
+   Idea: cada alimento tiene su tiempo. Los anillos de un tronco
+   son tiempo; el plazo de cada lote se lee con la misma lógica.
+   ========================================================== */
+
+:root {
+  /* Color */
+  --aire: #EDF2E4;          /* fondo: verde casi blanco, luminoso */
+  --bosque: #10281D;        /* tinta principal */
+  --tinta-suave: #3C5246;   /* texto secundario */
+  --hoja: #2F7A4B;          /* verde principal */
+  --hoja-oscura: #1F5E3A;
+  --menta: #C9DEC1;         /* superficies suaves y hover */
+  --suelo: #DCE6D0;         /* campo del dibujo */
+  --sol: #F0B43C;           /* calidez: miel, atención */
+  --ladrillo: #B8322A;      /* solo para lo urgente */
+
+  /* Tipografía */
+  --display: "Young Serif", Georgia, "Times New Roman", serif;
+  --texto: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Espacio */
+  --margen: clamp(1.25rem, 4vw, 3rem);
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--aire);
+  color: var(--bosque);
+  font-family: var(--texto);
+  font-size: 1rem;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2 {
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1.05;
+  margin: 0;
+}
+
+p { margin: 0; }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--hoja);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.contenedor {
+  width: min(100% - 2 * var(--margen), 72rem);
+  margin-inline: auto;
+}
+
+/* ---------- Cabecera ---------- */
+.barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-block: 1.25rem;
+}
+
+.marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-family: var(--display);
+  font-size: 1.35rem;
+  text-decoration: none;
+}
+
+.marca svg { width: 1.9rem; height: 1.9rem; flex: none; }
+
+.menu { display: flex; gap: 0.25rem; }
+
+.menu a {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.menu a:hover { background: var(--menta); }
+
+.menu a[aria-current="page"] {
+  background: var(--bosque);
+  color: var(--aire);
+}
+
+/* ---------- Botón ---------- */
+.boton {
+  display: inline-block;
+  padding: 0.9rem 1.75rem;
+  border-radius: 999px;
+  background: var(--bosque);
+  color: var(--aire);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.boton:hover { background: var(--hoja); }
+
+/* ---------- Portada ---------- */
+.portada {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  min-height: min(44rem, calc(100svh - 6rem));
+  padding-block: 1rem 3rem;
+}
+
+.portada-texto h1 {
+  font-size: clamp(2.6rem, 5.6vw, 4.6rem);
+  letter-spacing: -0.01em;
+}
+
+.portada-texto .bajada {
+  margin-top: 1.5rem;
+  max-width: 28rem;
+  font-size: 1.15rem;
+  color: var(--tinta-suave);
+}
+
+.portada-texto .boton { margin-top: 2rem; }
+
+.portada-texto .dato {
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--tinta-suave);
+}
+
+.portada-arte svg { display: block; width: 100%; height: auto; }
+
+/* Dibujo */
+.arte-suelo { fill: url(#borde-campo); }
+.arte-horizonte { stroke: url(#borde-linea); stroke-width: 1.5; }
+.arte-luz { fill: var(--sol); opacity: 0.28; }
+.arte-puerta { fill: var(--bosque); }
+.arte-puerta-luz { fill: var(--sol); }
+.arte-sombra { fill: var(--bosque); opacity: 0.16; }
+.anillo-a { fill: var(--hoja-oscura); }
+.anillo-b { fill: var(--hoja); }
+.arte-tiempo { fill: none; stroke: var(--sol); stroke-width: 7; }
+.arte-centro { fill: var(--bosque); }
+.arte-corte { fill: var(--aire); }
+
+.arte-disco,
+.arte-sombra {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.arte-disco { animation: flotar 9s ease-in-out infinite alternate; }
+.arte-sombra { animation: sombrear 9s ease-in-out infinite alternate; }
+
+@keyframes flotar {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-16px); }
+}
+
+@keyframes sombrear {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0.9); }
+}
+
+/* ---------- Inventario ---------- */
+.encabezado-pagina { padding-block: 2.5rem 2rem; }
+
+.encabezado-pagina h1 { font-size: clamp(2.3rem, 5vw, 3.6rem); }
+
+.resumen {
+  margin-top: 1.25rem;
+  max-width: 34rem;
+  font-size: 1.2rem;
+  color: var(--tinta-suave);
+}
+
+.resumen strong { color: var(--bosque); font-weight: 600; }
+
+.lotes {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4rem;
+}
+
+.lotes th {
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tinta-suave);
+  border-bottom: 2px solid var(--bosque);
+}
+
+.lotes td {
+  padding: 1rem 0.9rem;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(16, 40, 29, 0.14);
+}
+
+.lotes tbody tr:hover { background: rgba(201, 222, 193, 0.45); }
+
+.lotes .num { text-align: right; white-space: nowrap; }
+
+.lotes .principal { font-weight: 600; }
+
+.lotes .secundario {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+}
+
+.unidad { color: var(--tinta-suave); margin-left: 0.2rem; }
+
+/* Plazo: chip + barra que se acorta cuando el tiempo se acaba */
+.plazo {
+  display: inline-grid;
+  gap: 0.4rem;
+  min-width: 7.5rem;
+}
+
+.plazo-chip {
+  justify-self: start;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.plazo-pista {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(16, 40, 29, 0.12);
+  overflow: hidden;
+}
+
+.plazo-pista span {
+  display: block;
+  width: max(var(--p), 6%);
+  height: 100%;
+  border-radius: inherit;
+}
+
+.plazo-urgente .plazo-chip { background: #F4D6D2; color: #7A1D17; }
+.plazo-urgente .plazo-pista span { background: var(--ladrillo); }
+
+.plazo-pronto .plazo-chip { background: #FAE6B8; color: #5E3F00; }
+.plazo-pronto .plazo-pista span { background: var(--sol); }
+
+.plazo-ok .plazo-chip { background: #D3E6CC; color: #1B4A2E; }
+.plazo-ok .plazo-pista span { background: var(--hoja); }
+
+.vacio {
+  max-width: 30rem;
+  padding-block: 2rem 5rem;
+  font-size: 1.1rem;
+  color: var(--tinta-suave);
+}
+
+/* ---------- Pie ---------- */
+.pie {
+  padding-block: 2rem 2.5rem;
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+  border-top: 1px solid rgba(16, 40, 29, 0.14);
+}
+
+/* ---------- Pantallas pequeñas ---------- */
+@media (max-width: 52rem) {
+  .portada {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding-block: 0.5rem 2.5rem;
+  }
+
+  .portada-arte { order: -1; max-width: 26rem; }
+}
+
+@media (max-width: 46rem) {
+  .barra { flex-wrap: wrap; }
+
+  .lotes thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .lotes, .lotes tbody, .lotes tr, .lotes td { display: block; }
+
+  .lotes tr {
+    padding-block: 1rem;
+    border-bottom: 1px solid rgba(16, 40, 29, 0.14);
+  }
+
+  .lotes td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.35rem 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .lotes td::before {
+    content: attr(data-etiqueta);
+    flex: none;
+    font-size: 0.9rem;
+    color: var(--tinta-suave);
+    text-align: left;
+  }
+
+  .lotes tbody tr:hover { background: none; }
+}
+
+/* ---------- Movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .arte-disco, .arte-sombra { animation: none; }
+}
