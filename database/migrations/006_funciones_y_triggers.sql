@@ -1,172 +1,151 @@
-BEGIN;
+DROP TABLE IF EXISTS resultados_prueba;
+CREATE TEMP TABLE resultados_prueba (
+  prueba    TEXT,
+  resultado TEXT,
+  detalle   TEXT
+);
 
--- ============================================================
--- FUNCIÓN 1: saldo de un lote en una fecha
--- Suma lo que entró y lo liberado, y resta lo reservado y lo vencido
--- ============================================================
-CREATE OR REPLACE FUNCTION saldo_lote_a_fecha(p_id_lote INT, p_fecha DATE)
-RETURNS NUMERIC(10,2)
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT COALESCE(SUM(CASE tipo
-                        WHEN 'entrada'     THEN  cantidad
-                        WHEN 'liberacion'  THEN  cantidad
-                        WHEN 'reserva'     THEN -cantidad
-                        WHEN 'vencimiento' THEN -cantidad
-                        ELSE 0
-                      END), 0)::NUMERIC(10,2)
-  FROM movimiento_inventario
-  WHERE id_lote = p_id_lote
-    AND fecha < p_fecha + 1;
-$$;
+-- PRUEBA 0: ¿hay datos cargados?
+INSERT INTO resultados_prueba
+SELECT 'PRUEBA 0', 'INFO',
+       'lotes=' || (SELECT count(*) FROM lote) ||
+       ', reservas=' || (SELECT count(*) FROM reserva) ||
+       ', movimientos=' || (SELECT count(*) FROM movimiento_inventario) ||
+       ', auditoria=' || (SELECT count(*) FROM auditoria);
 
--- ============================================================
--- FUNCIÓN 2: tasa de aprovechamiento de un período
--- (entregado / donado) * 100, para una unidad de medida
--- ============================================================
-CREATE OR REPLACE FUNCTION tasa_aprovechamiento(
-  p_desde  DATE,
-  p_hasta  DATE,
-  p_unidad VARCHAR DEFAULT 'kg'
-)
-RETURNS NUMERIC(5,2)
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT round(
-           100.0 * COALESCE(SUM(m.cantidad) FILTER (WHERE m.tipo = 'salida'), 0)
-                 / NULLIF(SUM(m.cantidad) FILTER (WHERE m.tipo = 'entrada'), 0),
-           2)::NUMERIC(5,2)
-  FROM movimiento_inventario m
-  JOIN lote l   ON l.id_lote = m.id_lote
-  JOIN unidad u ON u.id_unidad = l.id_unidad
-  WHERE u.abreviatura = p_unidad
-    AND m.fecha >= p_desde
-    AND m.fecha <  p_hasta + 1;
-$$;
-
--- ============================================================
--- TRIGGER 1: AUDITORÍA
--- Una sola función que se conecta a varias tablas
--- ============================================================
-CREATE OR REPLACE FUNCTION auditar_cambio()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
+-- PRUEBA 1: saldo de la función vs saldo guardado en la tabla lote
+DO $$
 DECLARE
-  v_clave   TEXT := TG_ARGV[0];
-  v_usuario INT  := NULLIF(current_setting('app.id_usuario', true), '')::INT;
+  v_total      INT;
+  v_diferentes INT;
 BEGIN
-  IF TG_OP = 'DELETE' THEN
-    INSERT INTO auditoria (tabla, operacion, id_registro, datos_anteriores, id_usuario)
-    VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(OLD) ->> v_clave, to_jsonb(OLD), v_usuario);
-    RETURN OLD;
+  SELECT count(*),
+         count(*) FILTER (WHERE saldo_lote_a_fecha(id_lote, CURRENT_DATE) <> saldo)
+    INTO v_total, v_diferentes
+  FROM lote;
 
-  ELSIF TG_OP = 'INSERT' THEN
-    INSERT INTO auditoria (tabla, operacion, id_registro, datos_nuevos, id_usuario)
-    VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(NEW) ->> v_clave, to_jsonb(NEW), v_usuario);
-    RETURN NEW;
+  INSERT INTO resultados_prueba VALUES (
+    'PRUEBA 1',
+    CASE WHEN v_total = 0 THEN 'OMITIDA'
+         WHEN v_diferentes = 0 THEN 'OK'
+         ELSE 'REVISAR' END,
+    v_total || ' lotes revisados, ' || v_diferentes || ' con saldo distinto');
+END $$;
 
+-- PRUEBA 2: la tasa de aprovechamiento debe estar entre 0 y 100
+DO $$
+DECLARE
+  v_tasa NUMERIC;
+BEGIN
+  v_tasa := tasa_aprovechamiento(DATE '2026-01-01', DATE '2026-12-31', 'kg');
+
+  INSERT INTO resultados_prueba VALUES (
+    'PRUEBA 2',
+    CASE WHEN v_tasa IS NULL THEN 'FALLÓ'
+         WHEN v_tasa BETWEEN 0 AND 100 THEN 'OK'
+         ELSE 'FALLÓ' END,
+    'tasa = ' || COALESCE(v_tasa::TEXT, 'NULL (no hay entradas en kg en ese período)'));
+END $$;
+
+-- PRUEBA 3 (negativa): una reserva no activa NO puede volver a 'activa'
+DO $$
+DECLARE
+  v_id  INT;
+  v_res TEXT;
+  v_det TEXT;
+BEGIN
+  SELECT id_reserva INTO v_id FROM reserva WHERE estado <> 'activa' LIMIT 1;
+
+  IF v_id IS NULL THEN
+    v_res := 'OMITIDA';
+    v_det := 'no hay reservas que no estén activas en los datos de prueba';
   ELSE
-    INSERT INTO auditoria (tabla, operacion, id_registro, datos_anteriores, datos_nuevos, id_usuario)
-    VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(NEW) ->> v_clave,
-            to_jsonb(OLD), to_jsonb(NEW), v_usuario);
-    RETURN NEW;
-  END IF;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_auditoria_reserva ON reserva;
-CREATE TRIGGER trg_auditoria_reserva
-AFTER UPDATE ON reserva
-FOR EACH ROW
-WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
-EXECUTE FUNCTION auditar_cambio('id_reserva');
-
-DROP TRIGGER IF EXISTS trg_auditoria_entrega ON entrega;
-CREATE TRIGGER trg_auditoria_entrega
-AFTER INSERT ON entrega
-FOR EACH ROW
-EXECUTE FUNCTION auditar_cambio('id_entrega');
-
-DROP TRIGGER IF EXISTS trg_auditoria_usuario_rol ON usuario_rol;
-CREATE TRIGGER trg_auditoria_usuario_rol
-AFTER INSERT OR DELETE ON usuario_rol
-FOR EACH ROW
-EXECUTE FUNCTION auditar_cambio('id_usuario');
-
-DROP TRIGGER IF EXISTS trg_auditoria_lote ON lote;
-CREATE TRIGGER trg_auditoria_lote
-AFTER UPDATE ON lote
-FOR EACH ROW
-WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
-EXECUTE FUNCTION auditar_cambio('id_lote');
-
--- ============================================================
--- TRIGGER 2: ESTADO DE RESERVA
--- Solo se permite pasar de 'activa' a entregada, cancelada o vencida
--- ============================================================
-CREATE OR REPLACE FUNCTION validar_cambio_estado_reserva()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF OLD.estado = 'activa'
-     AND NEW.estado IN ('entregada', 'cancelada', 'vencida') THEN
-    RETURN NEW;
+    BEGIN
+      UPDATE reserva SET estado = 'activa' WHERE id_reserva = v_id;
+      v_res := 'FALLÓ';
+      v_det := 'la base permitió reactivar la reserva ' || v_id;
+      RAISE EXCEPTION 'deshacer_prueba';
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM = 'deshacer_prueba' THEN
+        NULL;  -- el FALLÓ ya quedó en las variables
+      ELSE
+        v_res := 'OK';
+        v_det := 'la base rechazó el cambio: ' || SQLERRM;
+      END IF;
+    END;
   END IF;
 
-  RAISE EXCEPTION 'Cambio de estado no permitido en la reserva %: % -> %',
-    OLD.id_reserva, OLD.estado, NEW.estado;
-END;
-$$;
+  INSERT INTO resultados_prueba VALUES ('PRUEBA 3', v_res, v_det);
+END $$;
 
-DROP TRIGGER IF EXISTS trg_validar_estado_reserva ON reserva;
-CREATE TRIGGER trg_validar_estado_reserva
-BEFORE UPDATE OF estado ON reserva
-FOR EACH ROW
-WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
-EXECUTE FUNCTION validar_cambio_estado_reserva();
-
--- ============================================================
--- TRIGGER 3: LOTE VÁLIDO AL RESERVAR
--- ============================================================
-CREATE OR REPLACE FUNCTION validar_lote_en_reserva()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
+-- PRUEBA 4 (positiva): cancelar una reserva activa deja auditoría con el usuario
+DO $$
 DECLARE
-  v_estado VARCHAR(15);
-  v_venc   DATE;
-  v_saldo  NUMERIC(10,2);
+  v_reserva INT;
+  v_usuario INT;
+  v_antes   INT;
+  v_despues INT;
+  v_actor   INT;
+  v_res_a   TEXT := 'FALLÓ';
+  v_det_a   TEXT := '';
+  v_res_b   TEXT := 'FALLÓ';
+  v_det_b   TEXT := '';
 BEGIN
-  SELECT estado, fecha_vencimiento, saldo
-    INTO v_estado, v_venc, v_saldo
-  FROM lote
-  WHERE id_lote = NEW.id_lote;
+  SELECT id_reserva INTO v_reserva FROM reserva WHERE estado = 'activa' LIMIT 1;
+  SELECT id_usuario INTO v_usuario FROM usuario ORDER BY id_usuario LIMIT 1;
 
-  IF v_estado <> 'activo' THEN
-    RAISE EXCEPTION 'El lote % no está activo (estado: %)', NEW.id_lote, v_estado;
+  IF v_reserva IS NULL THEN
+    INSERT INTO resultados_prueba VALUES
+      ('PRUEBA 4', 'OMITIDA', 'no hay reservas activas en los datos de prueba');
+    RETURN;
   END IF;
 
-  IF v_venc < CURRENT_DATE THEN
-    RAISE EXCEPTION 'El lote % está vencido (venció el %)', NEW.id_lote, v_venc;
-  END IF;
+  BEGIN
+    PERFORM set_config('app.id_usuario', v_usuario::TEXT, true);
 
-  IF NEW.cantidad > v_saldo THEN
-    RAISE EXCEPTION 'La cantidad % supera el saldo % del lote %',
-      NEW.cantidad, v_saldo, NEW.id_lote;
-  END IF;
+    SELECT count(*) INTO v_antes FROM auditoria WHERE tabla = 'reserva';
 
-  RETURN NEW;
-END;
-$$;
+    UPDATE reserva SET estado = 'cancelada' WHERE id_reserva = v_reserva;
 
-DROP TRIGGER IF EXISTS trg_validar_lote_en_reserva ON reserva_detalle;
-CREATE TRIGGER trg_validar_lote_en_reserva
-BEFORE INSERT ON reserva_detalle
-FOR EACH ROW
-EXECUTE FUNCTION validar_lote_en_reserva();
+    SELECT count(*) INTO v_despues FROM auditoria WHERE tabla = 'reserva';
 
-COMMIT;
+    SELECT id_usuario INTO v_actor
+    FROM auditoria
+    WHERE tabla = 'reserva'
+      AND id_registro = v_reserva::TEXT
+      AND datos_nuevos ->> 'estado' = 'cancelada'
+    LIMIT 1;
+
+    IF v_despues = v_antes + 1 THEN
+      v_res_a := 'OK';
+    END IF;
+    v_det_a := 'filas de auditoría antes=' || v_antes || ', después=' || v_despues;
+
+    IF v_actor = v_usuario THEN
+      v_res_b := 'OK';
+    END IF;
+    v_det_b := 'usuario esperado=' || v_usuario || ', guardado=' || COALESCE(v_actor::TEXT, 'NULL');
+
+    RAISE EXCEPTION 'deshacer_prueba';   -- deshace el UPDATE y la auditoría
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'deshacer_prueba' THEN
+      v_res_a := 'FALLÓ';
+      v_det_a := 'error inesperado: ' || SQLERRM;
+      v_res_b := 'FALLÓ';
+      v_det_b := 'no se pudo probar';
+    END IF;
+  END;
+
+  INSERT INTO resultados_prueba VALUES ('PRUEBA 4a', v_res_a, v_det_a);
+  INSERT INTO resultados_prueba VALUES ('PRUEBA 4b', v_res_b, v_det_b);
+END $$;
+
+-- PRUEBA 5: las reservas quedaron como estaban
+INSERT INTO resultados_prueba
+SELECT 'PRUEBA 5', 'INFO',
+       COALESCE(string_agg(estado || '=' || n, ', ' ORDER BY estado), 'sin reservas')
+FROM (SELECT estado, count(*) AS n FROM reserva GROUP BY estado) t;
+
+-- RESULTADO FINAL (esto es lo que ves en Data Output)
+SELECT * FROM resultados_prueba ORDER BY prueba;
+
