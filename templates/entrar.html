@@ -8,6 +8,7 @@
   <p class="bajada">Usa tu correo y tu contraseña.</p>
 
   <form method="post">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
     <label class="campo">Correo
       <input type="email" name="correo" required autofocus autocomplete="username">
     </label>

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}Entregas · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Entregas recientes</h1>
+  <p class="resumen">Las últimas 50 entregas confirmadas.</p>
+</section>
+
+{% if filas %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Entrega</th>
+        <th scope="col">Beneficiario</th>
+        <th scope="col">Punto</th>
+        <th scope="col">Gestor</th>
+        <th scope="col">Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in filas %}
+        <tr>
+          <td data-etiqueta="Entrega">
+            <span>
+              <span class="principal">#{{ e.id_entrega }}</span>
+              <span class="secundario">Reserva #{{ e.id_reserva }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Beneficiario">{{ e.beneficiario }}</td>
+          <td data-etiqueta="Punto">
+            <span>
+              {{ e.punto or 'Sin punto' }}
+              {% if e.observacion %}<span class="secundario">{{ e.observacion }}</span>{% endif %}
+            </span>
+          </td>
+          <td data-etiqueta="Gestor">{{ e.gestor }}</td>
+          <td data-etiqueta="Fecha">{{ e.fecha_entrega.strftime('%d/%m/%Y %H:%M') }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">Todavía no hay entregas registradas.</p>
+{% endif %}
+{% endblock %}

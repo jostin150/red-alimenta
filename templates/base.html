@@ -25,9 +25,19 @@
       </a>
       <nav class="menu" aria-label="Principal">
         {% if session.get('id_usuario') %}
+          {% set roles = session.get('roles', []) %}
+          {% set gestion = 'gestor' in roles or 'administrador' in roles %}
           <a href="{{ url_for('inicio') }}" {% if request.endpoint == 'inicio' %}aria-current="page"{% endif %}>Inicio</a>
           <a href="{{ url_for('inventario') }}" {% if request.endpoint == 'inventario' %}aria-current="page"{% endif %}>Inventario</a>
+          {% if gestion or 'beneficiario' in roles %}
+            <a href="{{ url_for('solicitudes') }}" {% if request.endpoint == 'solicitudes' %}aria-current="page"{% endif %}>Solicitudes</a>
+          {% endif %}
+          {% if gestion %}
+            <a href="{{ url_for('reservas') }}" {% if request.endpoint == 'reservas' %}aria-current="page"{% endif %}>Reservas</a>
+            <a href="{{ url_for('entregas') }}" {% if request.endpoint == 'entregas' %}aria-current="page"{% endif %}>Entregas</a>
+          {% endif %}
           <form method="post" action="{{ url_for('salir') }}">
+            <input type="hidden" name="csrf" value="{{ token_csrf() }}">
             <button type="submit">Salir ({{ session['nombre'] }})</button>
           </form>
         {% endif %}
@@ -45,7 +55,7 @@
     </main>
 
     <footer class="pie">
-      Red Alimenta Medellín. Proyecto integrador de Bases de datos II.
+      Red Alimenta Medellín. Proyecto Bases de datos II.
     </footer>
   </div>
 </body>

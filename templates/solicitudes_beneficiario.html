@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mis solicitudes · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Mis solicitudes</h1>
+  <p class="resumen">
+    Pide el tipo de alimento que necesitas. Un gestor revisará tu solicitud
+    y reservará el inventario disponible.
+  </p>
+</section>
+
+{% if opciones %}
+<form class="solicitud" method="post" action="{{ url_for('solicitud_nueva') }}">
+  <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+  <label class="campo">Qué necesitas
+    <select name="opcion" required>
+      <option value="">Elige un alimento</option>
+      {% for o in opciones %}
+        <option value="{{ o.id_categoria }}-{{ o.id_unidad }}">
+          {{ o.categoria }} · {{ o.unidad }} ({{ ('%.2f' | format(o.disponible)) | replace('.', ',') }} {{ o.abreviatura }} disponibles)
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="campo">Cantidad
+    <input type="number" name="cantidad" min="0.01" step="0.01" inputmode="decimal" required>
+  </label>
+  <button class="boton" type="submit">Enviar solicitud</button>
+</form>
+{% else %}
+  <p class="vacio">Por ahora no hay inventario disponible para solicitar. Vuelve a intentarlo más tarde.</p>
+{% endif %}
+
+<h2 class="subtitulo">Mi historial</h2>
+{% if propias %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Solicitud</th>
+        <th scope="col">Pedido</th>
+        <th scope="col">Fecha</th>
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in propias %}
+        <tr>
+          <td data-etiqueta="Solicitud"><span class="principal">#{{ s.id_solicitud }}</span></td>
+          <td data-etiqueta="Pedido">{{ s.pedido }}</td>
+          <td data-etiqueta="Fecha">{{ s.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+          <td data-etiqueta="Estado"><span class="estado estado-{{ s.estado }}">{{ s.estado }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">Todavía no has hecho solicitudes.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Solicitudes · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Solicitudes pendientes</h1>
+  {% if pendientes %}
+    <p class="resumen">
+      <strong>{{ pendientes | length }}</strong>
+      {{ 'solicitud espera' if pendientes | length == 1 else 'solicitudes esperan' }} una reserva.
+      Al reservar, el sistema toma primero los lotes que vencen antes.
+    </p>
+  {% endif %}
+</section>
+
+{% if pendientes %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Solicitud</th>
+        <th scope="col">Beneficiario</th>
+        <th scope="col">Pedido</th>
+        <th scope="col">Fecha</th>
+        <th scope="col">Acción</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in pendientes %}
+        <tr>
+          <td data-etiqueta="Solicitud"><span class="principal">#{{ s.id_solicitud }}</span></td>
+          <td data-etiqueta="Beneficiario">{{ s.beneficiario }}</td>
+          <td data-etiqueta="Pedido">{{ s.pedido }}</td>
+          <td data-etiqueta="Fecha">{{ s.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+          <td data-etiqueta="Acción">
+            <form method="post" action="{{ url_for('solicitud_reservar', id_solicitud=s.id_solicitud) }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <button class="boton-chico" type="submit">Reservar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">No hay solicitudes pendientes. Cuando un beneficiario pida alimento, aparecerá aquí.</p>
+{% endif %}
+{% endblock %}

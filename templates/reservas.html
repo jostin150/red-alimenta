@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reservas · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Reservas activas</h1>
+  {% if activas %}
+    <p class="resumen">
+      <strong>{{ activas | length }}</strong>
+      {{ 'reserva espera' if activas | length == 1 else 'reservas esperan' }}
+      su entrega. Si no se entrega, cancélala para liberar el inventario.
+    </p>
+  {% endif %}
+</section>
+
+{% if activas %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Reserva</th>
+        <th scope="col">Beneficiario</th>
+        <th scope="col">Lotes reservados</th>
+        <th scope="col">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in activas %}
+        <tr>
+          <td data-etiqueta="Reserva">
+            <span>
+              <span class="principal">#{{ r.id_reserva }}</span>
+              <span class="secundario">Solicitud #{{ r.id_solicitud }} · {{ r.fecha_reserva.strftime('%d/%m/%Y') }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Beneficiario">{{ r.beneficiario }}</td>
+          <td data-etiqueta="Lotes">{{ r.lotes }}</td>
+          <td data-etiqueta="Acciones" class="acciones">
+            <form method="post" action="{{ url_for('reserva_entregar', id_reserva=r.id_reserva) }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <select name="punto" required aria-label="Punto de entrega">
+                <option value="">Punto de entrega</option>
+                {% for p in puntos %}
+                  <option value="{{ p.id_punto }}">{{ p.nombre }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="observacion" maxlength="300" placeholder="Observación (opcional)" aria-label="Observación">
+              <button class="boton-chico" type="submit">Confirmar entrega</button>
+            </form>
+            <form method="post" action="{{ url_for('reserva_cancelar', id_reserva=r.id_reserva) }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="text" name="motivo" maxlength="300" placeholder="Motivo (opcional)" aria-label="Motivo de cancelación">
+              <button class="boton-chico boton-borde" type="submit">Cancelar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">No hay reservas activas. Reserva inventario desde la pantalla de solicitudes.</p>
+{% endif %}
+{% endblock %}

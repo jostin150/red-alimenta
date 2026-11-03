@@ -365,3 +365,68 @@ a { color: inherit; }
   cursor: pointer;
 }
 .menu button:hover { background: var(--menta); }
+/* ---------- Solicitudes, reservas y entregas ---------- */
+.aviso-ok { background: #D4EBC9; color: #1F5E3A; }
+
+.subtitulo { font-family: var(--display); font-size: 1.6rem; margin: 2.5rem 0 1rem; }
+
+.campo select {
+  font: inherit;
+  padding: 0.8rem 1rem;
+  border: 2px solid var(--menta);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--bosque);
+}
+.campo select:focus-visible { border-color: var(--hoja); outline-offset: 2px; }
+
+.solicitud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  align-items: end;
+  margin: 1.5rem 0 0.5rem;
+  max-width: 52rem;
+}
+.solicitud .boton { border: 0; cursor: pointer; font: inherit; font-weight: 600; }
+
+.estado {
+  display: inline-block;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--menta);
+  color: var(--bosque);
+}
+.estado-pendiente { background: #FAE6B8; color: #5E3F00; }
+.estado-cancelada, .estado-rechazada { background: #F4D6D2; color: #7A1D17; }
+
+.boton-chico {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.45rem 1rem;
+  border: 2px solid var(--hoja);
+  border-radius: 999px;
+  background: var(--hoja);
+  color: #fff;
+  cursor: pointer;
+}
+.boton-chico:hover { background: var(--hoja-oscura); border-color: var(--hoja-oscura); }
+.boton-borde { background: transparent; color: var(--ladrillo); border-color: var(--ladrillo); }
+.boton-borde:hover { background: #F4D6D2; border-color: var(--ladrillo); }
+
+.acciones form { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.6rem; }
+.acciones form:last-child { margin-bottom: 0; }
+.acciones select, .acciones input[type="text"] {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.7rem;
+  border: 2px solid var(--menta);
+  border-radius: 0.6rem;
+  background: #fff;
+  color: var(--bosque);
+  min-width: 0;
+  max-width: 100%;
+}
