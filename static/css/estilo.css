@@ -330,3 +330,38 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .arte-disco, .arte-sombra { animation: none; }
 }
+/* ---------- Formularios, avisos y botón de salir ---------- */
+.formulario { max-width: 26rem; padding-block: 2.5rem 3rem; }
+.formulario h1 { font-size: clamp(2.3rem, 5vw, 3.2rem); }
+.formulario .bajada { margin-top: 0.75rem; color: var(--tinta-suave); }
+.formulario form { margin-top: 2rem; display: grid; gap: 1.25rem; }
+
+.campo { display: grid; gap: 0.4rem; font-weight: 500; }
+.campo input {
+  font: inherit;
+  padding: 0.8rem 1rem;
+  border: 2px solid var(--menta);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--bosque);
+}
+.campo input:focus-visible { border-color: var(--hoja); outline-offset: 2px; }
+
+.formulario .boton { border: 0; cursor: pointer; font: inherit; font-weight: 600; justify-self: start; }
+
+.aviso { margin: 0 0 1rem; padding: 0.8rem 1.1rem; border-radius: 0.75rem; font-weight: 500; }
+.aviso-error { background: #F4D6D2; color: #7A1D17; }
+.aviso-info  { background: var(--menta); color: var(--bosque); }
+
+.menu form { margin: 0; }
+.menu button {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.menu button:hover { background: var(--menta); }

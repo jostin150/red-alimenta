@@ -24,17 +24,28 @@
         Red Alimenta
       </a>
       <nav class="menu" aria-label="Principal">
-        <a href="{{ url_for('inicio') }}" {% if request.endpoint == 'inicio' %}aria-current="page"{% endif %}>Inicio</a>
-        <a href="{{ url_for('inventario') }}" {% if request.endpoint == 'inventario' %}aria-current="page"{% endif %}>Inventario</a>
+        {% if session.get('id_usuario') %}
+          <a href="{{ url_for('inicio') }}" {% if request.endpoint == 'inicio' %}aria-current="page"{% endif %}>Inicio</a>
+          <a href="{{ url_for('inventario') }}" {% if request.endpoint == 'inventario' %}aria-current="page"{% endif %}>Inventario</a>
+          <form method="post" action="{{ url_for('salir') }}">
+            <button type="submit">Salir ({{ session['nombre'] }})</button>
+          </form>
+        {% endif %}
       </nav>
     </header>
 
     <main>
+      {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% for categoria, texto in mensajes %}
+          <p class="aviso aviso-{{ categoria }}" role="status">{{ texto }}</p>
+        {% endfor %}
+      {% endwith %}
+
       {% block contenido %}{% endblock %}
     </main>
 
     <footer class="pie">
-      Red Alimenta Medellín | Proyecto base de datos 2
+      Red Alimenta Medellín. Proyecto integrador de Bases de datos II.
     </footer>
   </div>
 </body>
