@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block titulo %}Inicio · Red Alimenta{% endblock %}
+
+{% block contenido %}
+  <h1>Red Alimenta Medellín</h1>
+  <p>La base de datos tiene {{ total_lotes }} lotes registrados.</p>
+  <p><a href="{{ url_for('inventario') }}">Ver el inventario disponible</a></p>
+{% endblock %}

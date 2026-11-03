@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block titulo %}Inventario · Red Alimenta{% endblock %}
+
+{% block contenido %}
+  <h1>Inventario disponible</h1>
+
+  {% if filas %}
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr>
+            {% for col in columnas %}
+              <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in filas %}
+            <tr>
+              {% for col in columnas %}
+                <td>{{ fila[col] if fila[col] is not none else "—" }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No hay lotes disponibles.</p>
+  {% endif %}
+{% endblock %}
