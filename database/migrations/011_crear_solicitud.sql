@@ -1,88 +1,64 @@
--- Pruebas de crear_solicitud
--- Muestra una tabla con 4 pruebas. No deja datos guardados: todo lo que
--- se crea durante la prueba se deshace automáticamente al terminar.
+-- PROCEDURE: public.crear_solicitud(integer, integer, integer, numeric, integer)
 
-CREATE OR REPLACE FUNCTION pg_temp.probar_crear_solicitud()
-RETURNS TABLE (prueba TEXT, resultado TEXT, detalle TEXT)
-LANGUAGE plpgsql
-AS $$
+-- DROP PROCEDURE IF EXISTS public.crear_solicitud(integer, integer, integer, numeric, integer);
+BEGIN;
+
+CREATE OR REPLACE PROCEDURE public.crear_solicitud(
+	IN p_id_usuario integer,
+	IN p_id_categoria integer,
+	IN p_id_unidad integer,
+	IN p_cantidad numeric,
+	INOUT p_id_solicitud integer)
+LANGUAGE 'plpgsql'
+    SECURITY DEFINER 
+    SET search_path=public, pg_temp
+AS $BODY$
 DECLARE
-  v_id          INT;
-  v_ben_usuario INT;
-  v_gestor      INT;
-  v_categoria   INT;
-  v_unidad      INT;
-  r_prueba      TEXT[] := '{}';
-  r_resultado   TEXT[] := '{}';
-  r_detalle     TEXT[] := '{}';
+  v_id_beneficiario INT;
+  v_estado          VARCHAR(15);
+  v_consentimiento  BOOLEAN;
 BEGIN
-  BEGIN  -- todo lo que ocurra dentro de este bloque se deshace al final
-    -- Buscamos datos que SÍ existen en tu base (los números pueden variar)
-    SELECT id_usuario INTO v_ben_usuario
-    FROM beneficiario WHERE estado = 'activo' AND consentimiento
-    ORDER BY id_usuario LIMIT 1;
+  SELECT b.id_beneficiario, b.estado, b.consentimiento
+    INTO v_id_beneficiario, v_estado, v_consentimiento
+  FROM beneficiario b
+  JOIN usuario u ON u.id_usuario = b.id_usuario
+  WHERE b.id_usuario = p_id_usuario AND u.activo;
 
-    SELECT ur.id_usuario INTO v_gestor
-    FROM usuario_rol ur JOIN rol r ON r.id_rol = ur.id_rol
-    WHERE r.nombre = 'gestor' ORDER BY ur.id_usuario LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El usuario % no es un beneficiario activo', p_id_usuario;
+  END IF;
+  IF v_estado <> 'activo' THEN
+    RAISE EXCEPTION 'Tu perfil de beneficiario no está activo';
+  END IF;
+  IF NOT v_consentimiento THEN
+    RAISE EXCEPTION 'Debes aceptar el tratamiento de tus datos antes de solicitar';
+  END IF;
+  IF p_cantidad IS NULL OR p_cantidad <= 0 THEN
+    RAISE EXCEPTION 'La cantidad debe ser mayor que cero';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM categoria WHERE id_categoria = p_id_categoria) THEN
+    RAISE EXCEPTION 'La categoría % no existe', p_id_categoria;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM unidad WHERE id_unidad = p_id_unidad) THEN
+    RAISE EXCEPTION 'La unidad % no existe', p_id_unidad;
+  END IF;
 
-    SELECT id_categoria INTO v_categoria FROM categoria ORDER BY id_categoria LIMIT 1;
-    SELECT id_unidad    INTO v_unidad    FROM unidad    ORDER BY id_unidad    LIMIT 1;
+  INSERT INTO solicitud (id_beneficiario)
+  VALUES (v_id_beneficiario)
+  RETURNING id_solicitud INTO p_id_solicitud;
 
-    -- 1) Caso feliz
-    CALL crear_solicitud(v_ben_usuario, v_categoria, v_unidad, 5, v_id);
-    r_prueba := array_append(r_prueba, ('1 solicitud válida')::text);
-    IF EXISTS (SELECT 1 FROM solicitud s JOIN beneficiario b USING (id_beneficiario)
-               WHERE s.id_solicitud = v_id AND b.id_usuario = v_ben_usuario
-                 AND s.estado = 'pendiente') THEN
-      r_resultado := array_append(r_resultado, ('OK')::text);
-      r_detalle := array_append(r_detalle, (('se creó la solicitud pendiente número ' || v_id))::text);
-    ELSE
-      r_resultado := array_append(r_resultado, ('FALLÓ')::text);
-      r_detalle := array_append(r_detalle, ('la solicitud no quedó pendiente')::text);
-    END IF;
-
-    -- 2) Cantidad cero
-    r_prueba := array_append(r_prueba, ('2 cantidad 0')::text);
-    BEGIN
-      CALL crear_solicitud(v_ben_usuario, v_categoria, v_unidad, 0, v_id);
-      r_resultado := array_append(r_resultado, ('FALLÓ')::text);
-      r_detalle := array_append(r_detalle, ('debía rechazarla')::text);
-    EXCEPTION WHEN OTHERS THEN
-      r_resultado := array_append(r_resultado, ('OK')::text);
-      r_detalle := array_append(r_detalle, (SQLERRM)::text);
-    END;
-
-    -- 3) Un gestor no es beneficiario
-    r_prueba := array_append(r_prueba, ('3 gestor pide')::text);
-    BEGIN
-      CALL crear_solicitud(v_gestor, v_categoria, v_unidad, 5, v_id);
-      r_resultado := array_append(r_resultado, ('FALLÓ')::text);
-      r_detalle := array_append(r_detalle, ('debía rechazarla')::text);
-    EXCEPTION WHEN OTHERS THEN
-      r_resultado := array_append(r_resultado, ('OK')::text);
-      r_detalle := array_append(r_detalle, (SQLERRM)::text);
-    END;
-
-    -- 4) Categoría inexistente
-    r_prueba := array_append(r_prueba, ('4 categoría falsa')::text);
-    BEGIN
-      CALL crear_solicitud(v_ben_usuario, 999999, v_unidad, 5, v_id);
-      r_resultado := array_append(r_resultado, ('FALLÓ')::text);
-      r_detalle := array_append(r_detalle, ('debía rechazarla')::text);
-    EXCEPTION WHEN OTHERS THEN
-      r_resultado := array_append(r_resultado, ('OK')::text);
-      r_detalle := array_append(r_detalle, (SQLERRM)::text);
-    END;
-
-    -- Forzamos un error a propósito para que PostgreSQL deshaga lo creado
-    RAISE EXCEPTION 'deshacer_pruebas' USING ERRCODE = 'P0099';
-  EXCEPTION WHEN SQLSTATE 'P0099' THEN
-    NULL;  -- esperado: los datos de prueba se deshicieron, los resultados quedan
-  END;
-
-  RETURN QUERY SELECT * FROM unnest(r_prueba, r_resultado, r_detalle);
+  INSERT INTO solicitud_detalle (id_solicitud, id_categoria, id_unidad, cantidad_solicitada)
+  VALUES (p_id_solicitud, p_id_categoria, p_id_unidad, p_cantidad);
 END;
-$$;
+$BODY$;
 
-SELECT * FROM pg_temp.probar_crear_solicitud();
+
+GRANT EXECUTE ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) TO alimenta_app;
+
+GRANT EXECUTE ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) TO alimenta_user;
+
+REVOKE ALL ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) FROM PUBLIC;
+
+GRANT EXECUTE ON PROCEDURE crear_solicitud(INT, INT, INT, NUMERIC, INT) TO alimenta_app;
+
+COMMIT;
