@@ -1,6 +1,7 @@
 """Punto de entrada de la aplicación Red Alimenta Medellín."""
 import os
 import secrets
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from db import ErrorDeNegocio, consultar, ejecutar
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 ROLES_GESTION = ("gestor", "administrador")
+ROLES_DONACION = ("donante", "gestor", "administrador")
 
 app = Flask(__name__)
 
@@ -322,6 +324,90 @@ def entregas():
         """
     )
     return render_template("entregas.html", filas=filas)
+
+
+# ---------------------------------------------------------------------------
+# Registrar lotes (donaciones)
+#   - El donante solo puede registrar en las sedes de SU organización.
+#   - El gestor y el administrador pueden registrar en cualquier sede.
+#   La regla final la hace cumplir la base de datos (registrar_lote), así
+#   que aunque alguien manipule el formulario, la base lo rechaza.
+# ---------------------------------------------------------------------------
+@app.route("/lotes")
+@rol_requerido(*ROLES_DONACION)
+def lotes():
+    uid = session["id_usuario"]
+    sedes = consultar(
+        """
+        SELECT s.id_sede, s.nombre AS sede, s.direccion, d.nombre AS donante
+        FROM sede s
+        JOIN donante d ON d.id_donante = s.id_donante
+        WHERE d.activo
+          AND (%s OR s.id_donante IN (
+                SELECT id_donante FROM usuario_donante WHERE id_usuario = %s))
+        ORDER BY d.nombre, s.nombre
+        """,
+        (es_gestion(), uid),        # el usuario sale siempre de la sesión
+    )
+    categorias = consultar("SELECT id_categoria, nombre FROM categoria ORDER BY nombre")
+    unidades = consultar("SELECT id_unidad, nombre, abreviatura FROM unidad ORDER BY nombre")
+    recientes = consultar(
+        """
+        SELECT l.id_lote, l.descripcion, c.nombre AS categoria, s.nombre AS sede,
+               l.cantidad_inicial, l.saldo, u.abreviatura,
+               l.fecha_vencimiento, l.estado
+        FROM lote l
+        JOIN sede s      ON s.id_sede = l.id_sede
+        JOIN categoria c ON c.id_categoria = l.id_categoria
+        JOIN unidad u    ON u.id_unidad = l.id_unidad
+        WHERE %s OR s.id_donante IN (
+                SELECT id_donante FROM usuario_donante WHERE id_usuario = %s)
+        ORDER BY l.creado_en DESC
+        LIMIT 15
+        """,
+        (es_gestion(), uid),
+    )
+    return render_template("lotes.html", sedes=sedes, categorias=categorias,
+                           unidades=unidades, recientes=recientes,
+                           hoy=date.today().isoformat())
+
+
+@app.route("/lotes/nuevo", methods=["POST"])
+@rol_requerido(*ROLES_DONACION)
+def lote_nuevo():
+    sede = request.form.get("sede", type=int)
+    categoria = request.form.get("categoria", type=int)
+    unidad = request.form.get("unidad", type=int)
+    descripcion = request.form.get("descripcion", "").strip()
+    try:
+        cantidad = Decimal(request.form.get("cantidad", "").replace(",", ".").strip())
+        cantidad = cantidad.quantize(Decimal("0.01")) if cantidad.is_finite() else None
+    except InvalidOperation:
+        cantidad = None
+    try:
+        vence = date.fromisoformat(request.form.get("vence", ""))
+    except ValueError:
+        vence = None
+
+    if None in (sede, categoria, unidad) or not descripcion or len(descripcion) > 150:
+        flash("Elige la sede, la categoría y la unidad, y escribe una "
+              "descripción de máximo 150 letras.", "error")
+    elif cantidad is None or cantidad <= 0 or cantidad >= Decimal("100000000"):
+        flash("Escribe una cantidad válida, mayor que cero.", "error")
+    elif vence is None or vence < date.today():
+        flash("Escribe una fecha de vencimiento de hoy en adelante.", "error")
+    else:
+        uid = session["id_usuario"]
+        try:
+            filas = ejecutar(
+                "CALL registrar_lote(%s, %s, %s, %s, %s, %s, %s, NULL)",
+                (uid, sede, categoria, unidad, descripcion, cantidad, vence),
+                id_usuario=uid,
+            )
+            flash(f"Lote #{filas[0]['p_id_lote']} registrado. ¡Gracias por la donación!", "ok")
+        except ErrorDeNegocio as e:
+            flash(str(e), "error")
+    return redirect(url_for("lotes"))
 
 
 # ---------------------------------------------------------------------------

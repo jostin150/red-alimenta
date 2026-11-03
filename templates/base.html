@@ -29,6 +29,9 @@
           {% set gestion = 'gestor' in roles or 'administrador' in roles %}
           <a href="{{ url_for('inicio') }}" {% if request.endpoint == 'inicio' %}aria-current="page"{% endif %}>Inicio</a>
           <a href="{{ url_for('inventario') }}" {% if request.endpoint == 'inventario' %}aria-current="page"{% endif %}>Inventario</a>
+          {% if 'donante' in roles or gestion %}
+            <a href="{{ url_for('lotes') }}" {% if request.endpoint == 'lotes' %}aria-current="page"{% endif %}>Registrar lote</a>
+          {% endif %}
           {% if gestion or 'beneficiario' in roles %}
             <a href="{{ url_for('solicitudes') }}" {% if request.endpoint == 'solicitudes' %}aria-current="page"{% endif %}>Solicitudes</a>
           {% endif %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registrar lote · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Registrar lote</h1>
+  <p class="resumen">
+    Anota una donación de alimentos. Cada lote queda con su cantidad, su fecha
+    de vencimiento y un movimiento de entrada en el inventario.
+  </p>
+</section>
+
+{% if sedes %}
+<form class="solicitud" method="post" action="{{ url_for('lote_nuevo') }}">
+  <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+
+  <label class="campo">Sede
+    <select name="sede" required>
+      <option value="">Elige la sede</option>
+      {% for s in sedes %}
+        <option value="{{ s.id_sede }}">{{ s.donante }} · {{ s.sede }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="campo">Categoría
+    <select name="categoria" required>
+      <option value="">Elige la categoría</option>
+      {% for c in categorias %}
+        <option value="{{ c.id_categoria }}">{{ c.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="campo">Descripción
+    <input type="text" name="descripcion" maxlength="150" required
+           placeholder="Por ejemplo: pan de bono del día">
+  </label>
+
+  <label class="campo">Cantidad
+    <input type="number" name="cantidad" min="0.01" step="0.01" inputmode="decimal" required>
+  </label>
+
+  <label class="campo">Unidad
+    <select name="unidad" required>
+      <option value="">Elige la unidad</option>
+      {% for u in unidades %}
+        <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.abreviatura }})</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="campo">Vence el
+    <input type="date" name="vence" min="{{ hoy }}" required>
+  </label>
+
+  <button class="boton" type="submit">Registrar lote</button>
+</form>
+{% else %}
+  <p class="vacio">Tu usuario todavía no está vinculado a ninguna sede. Pide a un administrador que lo vincule.</p>
+{% endif %}
+
+<h2 class="subtitulo">Lotes recientes</h2>
+{% if recientes %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Lote</th>
+        <th scope="col">Descripción</th>
+        <th scope="col">Sede</th>
+        <th scope="col">Cantidad</th>
+        <th scope="col">Saldo</th>
+        <th scope="col">Vence</th>
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in recientes %}
+        <tr>
+          <td data-etiqueta="Lote"><span class="principal">#{{ l.id_lote }}</span></td>
+          <td data-etiqueta="Descripción">{{ l.descripcion }}<span class="secundario">{{ l.categoria }}</span></td>
+          <td data-etiqueta="Sede">{{ l.sede }}</td>
+          <td data-etiqueta="Cantidad" class="num">{{ ('%.2f' | format(l.cantidad_inicial)) | replace('.', ',') }}<span class="unidad">{{ l.abreviatura }}</span></td>
+          <td data-etiqueta="Saldo" class="num">{{ ('%.2f' | format(l.saldo)) | replace('.', ',') }}<span class="unidad">{{ l.abreviatura }}</span></td>
+          <td data-etiqueta="Vence">{{ l.fecha_vencimiento.strftime('%d/%m/%Y') }}</td>
+          <td data-etiqueta="Estado"><span class="estado">{{ l.estado }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">Todavía no hay lotes registrados.</p>
+{% endif %}
+{% endblock %}
