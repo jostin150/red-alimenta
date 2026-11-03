@@ -3,30 +3,76 @@
 {% block titulo %}Inventario · Red Alimenta{% endblock %}
 
 {% block contenido %}
-  <h1>Inventario disponible</h1>
+{% set total = filas | length %}
+{% set urgentes = filas | selectattr('dias_para_vencer', 'le', 3) | list | length %}
 
-  {% if filas %}
-    <div class="tabla-scroll">
-      <table>
-        <thead>
-          <tr>
-            {% for col in columnas %}
-              <th>{{ col }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for fila in filas %}
-            <tr>
-              {% for col in columnas %}
-                <td>{{ fila[col] if fila[col] is not none else "—" }}</td>
-              {% endfor %}
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p>No hay lotes disponibles.</p>
+<section class="encabezado-pagina">
+  <h1>Inventario disponible</h1>
+  {% if total %}
+    <p class="resumen">
+      <strong>{{ total }}</strong>
+      {{ 'lote aún puede alimentar' if total == 1 else 'lotes aún pueden alimentar' }} a alguien.
+      {% if urgentes == 0 %}
+        Ninguno vence en los próximos 3 días.
+      {% elif urgentes == 1 %}
+        <strong>1</strong> vence en 3 días o menos.
+      {% else %}
+        <strong>{{ urgentes }}</strong> vencen en 3 días o menos.
+      {% endif %}
+    </p>
   {% endif %}
+</section>
+
+{% if filas %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Lote</th>
+        <th scope="col">Origen</th>
+        <th scope="col">Categoría</th>
+        <th scope="col" class="num">Saldo</th>
+        <th scope="col">Vence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fila in filas %}
+        {% set d = fila.dias_para_vencer %}
+        {% set nivel = 'urgente' if d <= 3 else ('pronto' if d <= 7 else 'ok') %}
+        <tr>
+          <td data-etiqueta="Lote">
+            <span>
+              <span class="principal">{{ fila.descripcion }}</span>
+              <span class="secundario">Código {{ fila.id_lote }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Origen">
+            <span>
+              <span class="principal">{{ fila.donante }}</span>
+              <span class="secundario">{{ fila.sede }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Categoría">{{ fila.categoria }}</td>
+          <td class="num" data-etiqueta="Saldo">
+            <span>{{ ('%.2f' | format(fila.saldo)) | replace('.', ',') }}<span class="unidad">{{ fila.unidad }}</span></span>
+          </td>
+          <td data-etiqueta="Vence">
+            <span class="plazo plazo-{{ nivel }}" style="--p: {{ ([d, 14] | min) * 100 // 14 }}%">
+              <span class="plazo-chip">
+                {% if d <= 0 %}Vence hoy{% elif d == 1 %}1 día{% else %}{{ d }} días{% endif %}
+              </span>
+              <span class="plazo-pista"><span></span></span>
+              <span class="secundario">
+                {{ fila.fecha_vencimiento.strftime('%d/%m/%Y') if fila.fecha_vencimiento.strftime is defined else fila.fecha_vencimiento }}
+              </span>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">
+    No hay lotes disponibles por ahora. Cuando un donante registre uno, aparecerá aquí.
+  </p>
+{% endif %}
 {% endblock %}

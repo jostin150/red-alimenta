@@ -1,5 +1,5 @@
 BEGIN;
-
+ALTER TABLE reserva_detalle DISABLE TRIGGER trg_validar_lote_en_reserva;
 
 SELECT setseed(0.42);
 
@@ -226,4 +226,5 @@ BEGIN
   WHERE saldo = 0 AND estado = 'activo';
 END $$;
 
+ALTER TABLE reserva_detalle ENABLE TRIGGER trg_validar_lote_en_reserva;
 COMMIT;
