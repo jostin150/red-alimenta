@@ -36,6 +36,7 @@
             <a href="{{ url_for('solicitudes') }}" {% if request.endpoint == 'solicitudes' %}aria-current="page"{% endif %}>Solicitudes</a>
           {% endif %}
           {% if gestion %}
+            <a href="{{ url_for('alertas') }}" {% if request.endpoint == 'alertas' %}aria-current="page"{% endif %}>Alertas</a>
             <a href="{{ url_for('reservas') }}" {% if request.endpoint == 'reservas' %}aria-current="page"{% endif %}>Reservas</a>
             <a href="{{ url_for('entregas') }}" {% if request.endpoint == 'entregas' %}aria-current="page"{% endif %}>Entregas</a>
           {% endif %}

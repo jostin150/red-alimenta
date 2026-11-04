@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block titulo %}Alertas de vencimiento · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<section class="encabezado-pagina">
+  <h1>Alertas de vencimiento</h1>
+  <p class="resumen">
+    {% if por_vencer or vencidos %}
+      <strong>{{ por_vencer | length }}</strong>
+      {{ 'lote vence' if por_vencer | length == 1 else 'lotes vencen' }} en 3 días o menos y
+      <strong>{{ vencidos | length }}</strong>
+      {{ 'lote ya venció' if vencidos | length == 1 else 'lotes ya vencieron' }} sin registrarse como pérdida.
+    {% else %}
+      Todo en orden: ningún lote vence pronto ni está vencido.
+    {% endif %}
+  </p>
+</section>
+
+<h2 class="subtitulo">Vencen en 3 días o menos</h2>
+{% if por_vencer %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Lote</th>
+        <th scope="col">Origen</th>
+        <th scope="col">Categoría</th>
+        <th scope="col" class="num">Saldo</th>
+        <th scope="col">Vence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in por_vencer %}
+        {% set d = f.dias_para_vencer %}
+        <tr>
+          <td data-etiqueta="Lote">
+            <span>
+              <span class="principal">{{ f.descripcion }}</span>
+              <span class="secundario">Código {{ f.id_lote }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Origen">
+            <span>
+              <span class="principal">{{ f.donante }}</span>
+              <span class="secundario">{{ f.sede }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Categoría">{{ f.categoria }}</td>
+          <td class="num" data-etiqueta="Saldo">
+            <span>{{ ('%.2f' | format(f.saldo)) | replace('.', ',') }}<span class="unidad">{{ f.unidad }}</span></span>
+          </td>
+          <td data-etiqueta="Vence">
+            <span class="plazo plazo-urgente" style="--p: {{ ([d, 14] | min) * 100 // 14 }}%">
+              <span class="plazo-chip">
+                {% if d <= 0 %}Vence hoy{% elif d == 1 %}1 día{% else %}{{ d }} días{% endif %}
+              </span>
+              <span class="plazo-pista"><span></span></span>
+              <span class="secundario">{{ f.fecha_vencimiento.strftime('%d/%m/%Y') }}</span>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">Ningún lote vence en los próximos 3 días.</p>
+{% endif %}
+
+<h2 class="subtitulo">Vencidos sin registrar como pérdida</h2>
+{% if vencidos %}
+  <p class="resumen">
+    Estos lotes ya pasaron su fecha y todavía tienen saldo. Al registrar la pérdida,
+    el saldo queda en cero, el lote pasa a «vencido» y el movimiento queda en el historial.
+  </p>
+  <form method="post" action="{{ url_for('marcar_vencidos') }}" style="margin: 1rem 0 1.5rem;">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+    <button class="boton" type="submit" style="border: 0; cursor: pointer; font: inherit; font-weight: 600;">
+      Registrar pérdida de {{ vencidos | length }} {{ 'lote' if vencidos | length == 1 else 'lotes' }}
+    </button>
+  </form>
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Lote</th>
+        <th scope="col">Origen</th>
+        <th scope="col">Categoría</th>
+        <th scope="col" class="num">Saldo que se pierde</th>
+        <th scope="col">Venció</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in vencidos %}
+        <tr>
+          <td data-etiqueta="Lote">
+            <span>
+              <span class="principal">{{ f.descripcion }}</span>
+              <span class="secundario">Código {{ f.id_lote }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Origen">
+            <span>
+              <span class="principal">{{ f.donante }}</span>
+              <span class="secundario">{{ f.sede }}</span>
+            </span>
+          </td>
+          <td data-etiqueta="Categoría">{{ f.categoria }}</td>
+          <td class="num" data-etiqueta="Saldo que se pierde">
+            <span>{{ ('%.2f' | format(f.saldo)) | replace('.', ',') }}<span class="unidad">{{ f.unidad }}</span></span>
+          </td>
+          <td data-etiqueta="Venció">
+            <span>
+              <span class="principal">{{ f.fecha_vencimiento.strftime('%d/%m/%Y') }}</span>
+              <span class="secundario">hace {{ f.dias_vencido }} {{ 'día' if f.dias_vencido == 1 else 'días' }}</span>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vacio">No hay lotes vencidos pendientes de registrar.</p>
+{% endif %}
+{% endblock %}

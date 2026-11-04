@@ -411,6 +411,54 @@ def lote_nuevo():
 
 
 # ---------------------------------------------------------------------------
+# Alertas de vencimiento (solo gestión)
+#   - "Por vencer": lotes que vencen en 3 días o menos (vista de la base).
+#   - "Vencidos sin registrar": lotes cuya fecha ya pasó y aún tienen saldo.
+#     El botón llama a marcar_lotes_vencidos, que los pasa a "vencido" y
+#     anota la pérdida en el historial de movimientos.
+# ---------------------------------------------------------------------------
+@app.route("/alertas")
+@rol_requerido(*ROLES_GESTION)
+def alertas():
+    por_vencer = consultar("SELECT * FROM v_alertas_vencimiento ORDER BY fecha_vencimiento")
+    vencidos = consultar(
+        """
+        SELECT l.id_lote, l.descripcion, d.nombre AS donante, s.nombre AS sede,
+               c.nombre AS categoria, l.saldo, u.abreviatura AS unidad,
+               l.fecha_vencimiento,
+               (CURRENT_DATE - l.fecha_vencimiento) AS dias_vencido
+        FROM lote l
+        JOIN sede s      ON s.id_sede = l.id_sede
+        JOIN donante d   ON d.id_donante = s.id_donante
+        JOIN categoria c ON c.id_categoria = l.id_categoria
+        JOIN unidad u    ON u.id_unidad = l.id_unidad
+        WHERE l.fecha_vencimiento < CURRENT_DATE
+          AND l.saldo > 0
+          AND l.estado IN ('activo', 'vencido')
+        ORDER BY l.fecha_vencimiento
+        """
+    )
+    return render_template("alertas.html", por_vencer=por_vencer, vencidos=vencidos)
+
+
+@app.route("/alertas/marcar-vencidos", methods=["POST"])
+@rol_requerido(*ROLES_GESTION)
+def marcar_vencidos():
+    uid = session["id_usuario"]
+    try:
+        filas = ejecutar("CALL marcar_lotes_vencidos(%s, NULL)", (uid,), id_usuario=uid)
+        n = filas[0]["p_lotes_marcados"]
+        if n:
+            flash(f"{n} lote{'s' if n != 1 else ''} marcado{'s' if n != 1 else ''} "
+                  "como vencido y la pérdida quedó registrada.", "ok")
+        else:
+            flash("No había lotes vencidos por registrar.", "info")
+    except ErrorDeNegocio as e:
+        flash(str(e), "error")
+    return redirect(url_for("alertas"))
+
+
+# ---------------------------------------------------------------------------
 # Páginas de error
 # ---------------------------------------------------------------------------
 @app.errorhandler(400)
