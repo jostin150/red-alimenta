@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "_detalle.html" import detalle, estilos %}
 
 {% block titulo %}Reservas · Red Alimenta{% endblock %}
 
 {% block contenido %}
+{{ estilos() }}
 <section class="encabezado-pagina">
   <h1>Reservas activas</h1>
   {% if activas %}
@@ -33,7 +35,13 @@
               <span class="secundario">Solicitud #{{ r.id_solicitud }} · {{ r.fecha_reserva.strftime('%d/%m/%Y') }}</span>
             </span>
           </td>
-          <td data-etiqueta="Beneficiario">{{ r.beneficiario }}</td>
+          <td data-etiqueta="Beneficiario">
+            <span>
+              {{ r.beneficiario }}
+              <span class="secundario">Pidió recoger en: {{ r.punto_solicitado or 'sin elegir' }}</span>
+              {{ detalle(r, 'Ver lo que pidió') }}
+            </span>
+          </td>
           <td data-etiqueta="Lotes">{{ r.lotes }}</td>
           <td data-etiqueta="Acciones" class="acciones">
             <form method="post" action="{{ url_for('reserva_entregar', id_reserva=r.id_reserva) }}">
@@ -41,7 +49,7 @@
               <select name="punto" required aria-label="Punto de entrega">
                 <option value="">Punto de entrega</option>
                 {% for p in puntos %}
-                  <option value="{{ p.id_punto }}">{{ p.nombre }}</option>
+                  <option value="{{ p.id_punto }}" {% if p.id_punto == r.id_punto_solicitado %}selected{% endif %}>{{ p.nombre }}</option>
                 {% endfor %}
               </select>
               <input type="text" name="observacion" maxlength="300" placeholder="Observación (opcional)" aria-label="Observación">

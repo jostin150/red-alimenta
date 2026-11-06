@@ -1,11 +1,13 @@
 {% extends "base.html" %}
+{% from "_detalle.html" import detalle, estilos %}
 
 {% block titulo %}Entregas · Red Alimenta{% endblock %}
 
 {% block contenido %}
+{{ estilos() }}
 <section class="encabezado-pagina">
   <h1>Entregas recientes</h1>
-  <p class="resumen">Las últimas 50 entregas confirmadas.</p>
+  <p class="resumen">Las últimas 50 entregas confirmadas. Abre "Ver detalle" para ver todo lo que pidió el beneficiario.</p>
 </section>
 
 {% if filas %}
@@ -28,7 +30,12 @@
               <span class="secundario">Reserva #{{ e.id_reserva }}</span>
             </span>
           </td>
-          <td data-etiqueta="Beneficiario">{{ e.beneficiario }}</td>
+          <td data-etiqueta="Beneficiario">
+            <span>
+              {{ e.beneficiario }}
+              {{ detalle(e) }}
+            </span>
+          </td>
           <td data-etiqueta="Punto">
             <span>
               {{ e.punto or 'Sin punto' }}

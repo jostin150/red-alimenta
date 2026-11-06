@@ -1,0 +1,65 @@
+{# Pieza reutilizable: el "Ver detalle" de una solicitud/entrega.
+   Se usa en Entregas y en Reservas. Recibe una fila con estos datos:
+   beneficiario, documento, comuna, id_solicitud, fecha_solicitud,
+   punto_solicitado, pedido (lista), lotes_detalle (lista) y, si ya se
+   entregó, fecha_entrega, gestor, punto y observacion. #}
+
+{% macro estilos() %}
+<style>
+  .detalle { margin-top: 0.5rem; }
+  .detalle summary { cursor: pointer; font-weight: 600; color: var(--hoja); }
+  .detalle-cuerpo {
+    margin-top: 0.6rem; padding: 0.9rem 1.1rem; max-width: 42rem;
+    background: #fff; border: 2px solid var(--menta); border-radius: 0.75rem;
+    font-weight: 400; color: var(--bosque);
+  }
+  .detalle-cuerpo p { margin: 0.35rem 0; }
+  .detalle-cuerpo ul { margin: 0.2rem 0 0.6rem 1.1rem; padding: 0; }
+  .detalle-cuerpo h4 { margin: 0.8rem 0 0.2rem; font-size: 0.95rem; color: var(--tinta-suave); }
+</style>
+{% endmacro %}
+
+{% macro detalle(d, titulo='Ver detalle') %}
+<details class="detalle">
+  <summary>{{ titulo }}</summary>
+  <div class="detalle-cuerpo">
+    <h4>Beneficiario</h4>
+    <p>{{ d.beneficiario }} · Documento {{ d.documento }} · Comuna {{ d.comuna or '—' }}</p>
+
+    <h4>Solicitud #{{ d.id_solicitud }} · {{ d.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}</h4>
+    <p>Punto de entrega elegido: <strong>{{ d.punto_solicitado or 'No eligió' }}</strong></p>
+    <ul>
+      {% for p in d.pedido %}
+        <li>
+          {{ p.tipo }} ({{ p.categoria }}) ·
+          {{ ('%.2f' | format(p.cantidad)) | replace('.', ',') }} {{ p.abreviatura }}
+        </li>
+      {% else %}
+        <li>Sin detalle</li>
+      {% endfor %}
+    </ul>
+
+    <h4>Lotes asignados (primero vence, primero sale)</h4>
+    <ul>
+      {% for l in d.lotes_detalle %}
+        <li>
+          Lote #{{ l.id_lote }} · {{ l.descripcion }} ·
+          {{ ('%.2f' | format(l.cantidad)) | replace('.', ',') }} {{ l.abreviatura }} ·
+          {{ l.donante }} ({{ l.sede }}) · vence {{ l.fecha_vencimiento.strftime('%d/%m/%Y') }}
+        </li>
+      {% else %}
+        <li>Sin lotes asignados</li>
+      {% endfor %}
+    </ul>
+
+    {% if d.fecha_entrega %}
+      <h4>Entrega</h4>
+      <p>
+        {{ d.fecha_entrega.strftime('%d/%m/%Y %H:%M') }} · gestor {{ d.gestor }} ·
+        punto {{ d.punto or 'sin punto' }}
+        {% if d.observacion %}<br>Observación: {{ d.observacion }}{% endif %}
+      </p>
+    {% endif %}
+  </div>
+</details>
+{% endmacro %}

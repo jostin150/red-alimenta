@@ -62,14 +62,174 @@ def es_gestion():
     return bool(set(session.get("roles", [])) & set(ROLES_GESTION))
 
 
+def agrupar(filas, clave):
+    """Agrupa una lista de filas en un diccionario {valor_de_clave: [filas]}."""
+    grupos = {}
+    for f in filas:
+        grupos.setdefault(f[clave], []).append(f)
+    return grupos
+
+
+def con_detalle(filas):
+    """A cada fila (reserva o entrega) le agrega lo que pidió el beneficiario
+    (`pedido`) y los lotes asignados (`lotes_detalle`), para el "Ver detalle"."""
+    if not filas:
+        return filas
+    pedido = agrupar(consultar(
+        """
+        SELECT sd.id_solicitud, t.nombre AS tipo, c.nombre AS categoria,
+               sd.cantidad_solicitada AS cantidad, u.abreviatura
+        FROM solicitud_detalle sd
+        JOIN tipo_alimento t ON t.id_tipo = sd.id_tipo
+        JOIN categoria c     ON c.id_categoria = sd.id_categoria
+        JOIN unidad u        ON u.id_unidad = sd.id_unidad
+        WHERE sd.id_solicitud = ANY(%s)
+        ORDER BY t.nombre
+        """,
+        ([f["id_solicitud"] for f in filas],),
+    ), "id_solicitud")
+    lotes = agrupar(consultar(
+        """
+        SELECT rd.id_reserva, l.id_lote, l.descripcion, rd.cantidad,
+               un.abreviatura, l.fecha_vencimiento,
+               d.nombre AS donante, s.nombre AS sede
+        FROM reserva_detalle rd
+        JOIN lote l    ON l.id_lote = rd.id_lote
+        JOIN sede s    ON s.id_sede = l.id_sede
+        JOIN donante d ON d.id_donante = s.id_donante
+        JOIN unidad un ON un.id_unidad = l.id_unidad
+        WHERE rd.id_reserva = ANY(%s)
+        ORDER BY l.fecha_vencimiento, l.id_lote
+        """,
+        ([f["id_reserva"] for f in filas],),
+    ), "id_reserva")
+    for f in filas:
+        f["pedido"] = pedido.get(f["id_solicitud"], [])
+        f["lotes_detalle"] = lotes.get(f["id_reserva"], [])
+    return filas
+
+
 # ---------------------------------------------------------------------------
 # Inicio e inventario
 # ---------------------------------------------------------------------------
+def contar(sql, params=None):
+    """Ejecuta un SELECT que devuelve un solo número (un conteo o una suma)."""
+    fila = consultar(sql, params)[0]
+    return list(fila.values())[0] or 0
+
+
 @app.route("/")
 @login_requerido
 def inicio():
-    total = consultar("SELECT count(*) AS total FROM lote")[0]["total"]
-    return render_template("inicio.html", total_lotes=total)
+    """Tablero de inicio: muestra un bloque por cada rol que tenga la persona."""
+    roles = session.get("roles", [])
+    uid = session["id_usuario"]
+    tableros = []
+
+    # --- Gestión (gestor y administrador) -------------------------------
+    if es_gestion():
+        vencidos = contar(
+            """SELECT count(*) FROM lote
+               WHERE fecha_vencimiento < CURRENT_DATE AND saldo > 0
+                 AND estado IN ('activo', 'vencido')""")
+        tableros.append({
+            "titulo": "Gestión",
+            "texto": "Lo que necesita atención hoy.",
+            "tarjetas": [
+                {"etiqueta": "Solicitudes pendientes", "enlace": "solicitudes",
+                 "valor": contar("SELECT count(*) FROM solicitud WHERE estado = 'pendiente'"),
+                 "urgente": False},
+                {"etiqueta": "Reservas por entregar", "enlace": "reservas",
+                 "valor": contar("SELECT count(*) FROM reserva WHERE estado = 'activa'"),
+                 "urgente": False},
+                {"etiqueta": "Lotes por vencer (3 días)", "enlace": "alertas",
+                 "valor": contar("SELECT count(*) FROM v_alertas_vencimiento"),
+                 "urgente": False},
+                {"etiqueta": "Vencidos sin registrar", "enlace": "alertas",
+                 "valor": vencidos, "urgente": vencidos > 0},
+                {"etiqueta": "Entregas este mes", "enlace": "entregas",
+                 "valor": contar("""SELECT count(*) FROM entrega
+                                    WHERE fecha_entrega >= date_trunc('month', now())"""),
+                 "urgente": False},
+            ],
+        })
+
+    # --- Administración (solo administrador) -----------------------------
+    if "administrador" in roles:
+        tableros.append({
+            "titulo": "Administración",
+            "texto": "Resumen general de la red.",
+            "tarjetas": [
+                {"etiqueta": "Usuarios activos", "enlace": None, "urgente": False,
+                 "valor": contar("SELECT count(*) FROM usuario WHERE activo")},
+                {"etiqueta": "Beneficiarios activos", "enlace": None, "urgente": False,
+                 "valor": contar("SELECT count(*) FROM beneficiario WHERE estado = 'activo'")},
+                {"etiqueta": "Donantes activos", "enlace": None, "urgente": False,
+                 "valor": contar("SELECT count(*) FROM donante WHERE activo")},
+                {"etiqueta": "Puntos de entrega", "enlace": None, "urgente": False,
+                 "valor": contar("SELECT count(*) FROM punto_entrega WHERE activo")},
+                {"etiqueta": "Lotes con inventario", "enlace": "inventario", "urgente": False,
+                 "valor": contar("""SELECT count(*) FROM lote
+                                    WHERE estado = 'activo' AND saldo > 0""")},
+            ],
+        })
+
+    # --- Donante ----------------------------------------------------------
+    if "donante" in roles:
+        propios = """FROM lote l
+                     JOIN sede s ON s.id_sede = l.id_sede
+                     WHERE s.id_donante IN (
+                       SELECT id_donante FROM usuario_donante WHERE id_usuario = %s)"""
+        tableros.append({
+            "titulo": "Mis donaciones",
+            "texto": "Lo que ha donado tu organización.",
+            "tarjetas": [
+                {"etiqueta": "Lotes registrados", "enlace": "lotes", "urgente": False,
+                 "valor": contar("SELECT count(*) " + propios, (uid,))},
+                {"etiqueta": "Lotes con inventario", "enlace": "lotes", "urgente": False,
+                 "valor": contar("SELECT count(*) " + propios +
+                                 " AND l.estado = 'activo' AND l.saldo > 0", (uid,))},
+                {"etiqueta": "Por vencer (3 días)", "enlace": "lotes", "urgente": False,
+                 "valor": contar("SELECT count(*) " + propios +
+                                 """ AND l.estado = 'activo' AND l.saldo > 0
+                                     AND l.fecha_vencimiento BETWEEN CURRENT_DATE
+                                         AND CURRENT_DATE + 3""", (uid,))},
+            ],
+        })
+
+    # --- Beneficiario -----------------------------------------------------
+    listas_para_recoger = []
+    if "beneficiario" in roles:
+        por_estado = {f["estado"]: f["n"] for f in consultar(
+            """SELECT s.estado, count(*) AS n
+               FROM solicitud s
+               JOIN beneficiario b ON b.id_beneficiario = s.id_beneficiario
+               WHERE b.id_usuario = %s
+               GROUP BY s.estado""", (uid,))}
+        tableros.append({
+            "titulo": "Mis solicitudes",
+            "texto": "Cómo van tus pedidos de alimento.",
+            "tarjetas": [
+                {"etiqueta": "Pendientes", "enlace": "solicitudes", "urgente": False,
+                 "valor": por_estado.get("pendiente", 0)},
+                {"etiqueta": "Listas para recoger", "enlace": "solicitudes", "urgente": False,
+                 "valor": por_estado.get("reservada", 0)},
+                {"etiqueta": "Entregadas", "enlace": "solicitudes", "urgente": False,
+                 "valor": por_estado.get("entregada", 0)},
+                {"etiqueta": "Canceladas", "enlace": "solicitudes", "urgente": False,
+                 "valor": por_estado.get("cancelada", 0)},
+            ],
+        })
+        listas_para_recoger = consultar(
+            """SELECT s.id_solicitud, p.nombre AS punto, p.direccion
+               FROM solicitud s
+               JOIN beneficiario b ON b.id_beneficiario = s.id_beneficiario
+               LEFT JOIN punto_entrega p ON p.id_punto = s.id_punto
+               WHERE b.id_usuario = %s AND s.estado = 'reservada'
+               ORDER BY s.fecha_solicitud""", (uid,))
+
+    return render_template("inicio.html", tableros=tableros,
+                           listas_para_recoger=listas_para_recoger)
 
 
 @app.route("/inventario")
@@ -299,8 +459,9 @@ def solicitud_reservar(id_solicitud):
 def reservas():
     activas = consultar(
         """
-        SELECT r.id_reserva, r.fecha_reserva, s.id_solicitud,
-               us.nombre AS beneficiario,
+        SELECT r.id_reserva, r.fecha_reserva, s.id_solicitud, s.fecha_solicitud,
+               us.nombre AS beneficiario, b.documento, b.comuna,
+               s.id_punto AS id_punto_solicitado, ps.nombre AS punto_solicitado,
                string_agg(l.descripcion || ' (' ||
                           replace(rd.cantidad::text, '.', ',') || ' ' || un.abreviatura ||
                           ', vence ' || to_char(l.fecha_vencimiento, 'DD/MM') || ')',
@@ -312,11 +473,14 @@ def reservas():
         JOIN reserva_detalle rd ON rd.id_reserva = r.id_reserva
         JOIN lote l             ON l.id_lote = rd.id_lote
         JOIN unidad un          ON un.id_unidad = l.id_unidad
+        LEFT JOIN punto_entrega ps ON ps.id_punto = s.id_punto
         WHERE r.estado = 'activa'
-        GROUP BY r.id_reserva, r.fecha_reserva, s.id_solicitud, us.nombre
+        GROUP BY r.id_reserva, r.fecha_reserva, s.id_solicitud, s.fecha_solicitud,
+                 us.nombre, b.documento, b.comuna, s.id_punto, ps.nombre
         ORDER BY r.fecha_reserva
         """
     )
+    activas = con_detalle(activas)
     puntos = consultar("SELECT id_punto, nombre FROM punto_entrega WHERE activo ORDER BY nombre")
     return render_template("reservas.html", activas=activas, puntos=puntos)
 
@@ -363,21 +527,24 @@ def reserva_cancelar(id_reserva):
 def entregas():
     filas = consultar(
         """
-        SELECT e.id_entrega, e.fecha_entrega, e.id_reserva,
-               us.nombre AS beneficiario, g.nombre AS gestor,
-               p.nombre AS punto, e.observacion
+        SELECT e.id_entrega, e.fecha_entrega, e.id_reserva, e.observacion,
+               s.id_solicitud, s.fecha_solicitud,
+               us.nombre AS beneficiario, b.documento, b.comuna,
+               g.nombre AS gestor, p.nombre AS punto,
+               ps.nombre AS punto_solicitado
         FROM entrega e
         JOIN usuario g          ON g.id_usuario = e.id_usuario_gestor
         JOIN reserva r          ON r.id_reserva = e.id_reserva
         JOIN solicitud s        ON s.id_solicitud = r.id_solicitud
         JOIN beneficiario b     ON b.id_beneficiario = s.id_beneficiario
         JOIN usuario us         ON us.id_usuario = b.id_usuario
-        LEFT JOIN punto_entrega p ON p.id_punto = e.id_punto
+        LEFT JOIN punto_entrega p  ON p.id_punto = e.id_punto
+        LEFT JOIN punto_entrega ps ON ps.id_punto = s.id_punto
         ORDER BY e.fecha_entrega DESC
         LIMIT 50
         """
     )
-    return render_template("entregas.html", filas=filas)
+    return render_template("entregas.html", filas=con_detalle(filas))
 
 
 # ---------------------------------------------------------------------------

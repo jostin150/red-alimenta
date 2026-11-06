@@ -3,7 +3,61 @@
 {% block titulo %}Inicio · Red Alimenta{% endblock %}
 
 {% block contenido %}
-<h1>Red Alimenta Medellín</h1>
-<p>Hay <strong>{{ total_lotes }}</strong> lotes registrados en el sistema.</p>
-<p><a href="{{ url_for('inventario') }}">Ver inventario disponible</a></p>
+<style>
+  .tablero { margin-top: 2rem; }
+  .tablero h2 { font-family: var(--display); font-size: 1.6rem; margin: 0; }
+  .tablero > p { margin: 0.2rem 0 1rem; color: var(--tinta-suave); }
+  .tarjetas { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+  .tarjeta {
+    display: block; padding: 1rem 1.1rem; text-decoration: none;
+    background: #fff; border: 2px solid var(--menta); border-radius: 1rem;
+    color: var(--bosque);
+  }
+  a.tarjeta:hover { border-color: var(--hoja); }
+  .tarjeta .valor { display: block; font-family: var(--display); font-size: 2.2rem; line-height: 1.1; }
+  .tarjeta .etiqueta { display: block; margin-top: 0.2rem; font-size: 0.92rem; color: var(--tinta-suave); }
+  .tarjeta.urgente { border-color: var(--ladrillo); }
+  .tarjeta.urgente .valor { color: var(--ladrillo); }
+  .recoger { margin-top: 1rem; padding: 1rem 1.2rem; background: var(--menta); border-radius: 1rem; }
+  .recoger ul { margin: 0.4rem 0 0 1.1rem; padding: 0; }
+</style>
+
+<section class="encabezado-pagina">
+  <h1>Hola, {{ session['nombre'] }}</h1>
+  <p class="resumen">Este es tu resumen en Red Alimenta Medellín.</p>
+</section>
+
+{% for t in tableros %}
+  <section class="tablero">
+    <h2>{{ t.titulo }}</h2>
+    <p>{{ t.texto }}</p>
+    <div class="tarjetas">
+      {% for c in t.tarjetas %}
+        {% if c.enlace %}
+          <a class="tarjeta {{ 'urgente' if c.urgente }}" href="{{ url_for(c.enlace) }}">
+        {% else %}
+          <div class="tarjeta {{ 'urgente' if c.urgente }}">
+        {% endif %}
+            <span class="valor">{{ c.valor }}</span>
+            <span class="etiqueta">{{ c.etiqueta }}</span>
+        {% if c.enlace %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
+
+    {% if t.titulo == 'Mis solicitudes' and listas_para_recoger %}
+      <div class="recoger">
+        <strong>Tienes alimento reservado para recoger:</strong>
+        <ul>
+          {% for r in listas_para_recoger %}
+            <li>Solicitud #{{ r.id_solicitud }} · {{ r.punto or 'punto sin elegir' }}{% if r.direccion %} ({{ r.direccion }}){% endif %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </section>
+{% else %}
+  <p class="vacio">Tu usuario todavía no tiene un rol asignado. Pide a un administrador que te lo asigne.</p>
+{% endfor %}
+
+<p style="margin-top:2rem"><a href="{{ url_for('inventario') }}">Ver inventario disponible</a></p>
 {% endblock %}
