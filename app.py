@@ -404,15 +404,21 @@ def lotes():
         (es_gestion(), uid),        # el usuario sale siempre de la sesión
     )
     categorias = consultar("SELECT id_categoria, nombre FROM categoria ORDER BY nombre")
+    tipos_js = consultar(
+        "SELECT id_tipo, id_categoria, nombre FROM tipo_alimento "
+        "WHERE activo ORDER BY (nombre = 'Otro'), nombre"
+    )
     unidades = consultar("SELECT id_unidad, nombre, abreviatura FROM unidad ORDER BY nombre")
     recientes = consultar(
         """
-        SELECT l.id_lote, l.descripcion, c.nombre AS categoria, s.nombre AS sede,
+        SELECT l.id_lote, l.descripcion, c.nombre AS categoria, t.nombre AS tipo,
+               s.nombre AS sede,
                l.cantidad_inicial, l.saldo, u.abreviatura,
                l.fecha_vencimiento, l.estado
         FROM lote l
         JOIN sede s      ON s.id_sede = l.id_sede
         JOIN categoria c ON c.id_categoria = l.id_categoria
+        JOIN tipo_alimento t ON t.id_tipo = l.id_tipo
         JOIN unidad u    ON u.id_unidad = l.id_unidad
         WHERE %s OR s.id_donante IN (
                 SELECT id_donante FROM usuario_donante WHERE id_usuario = %s)
@@ -422,7 +428,7 @@ def lotes():
         (es_gestion(), uid),
     )
     return render_template("lotes.html", sedes=sedes, categorias=categorias,
-                           unidades=unidades, recientes=recientes,
+                           unidades=unidades, tipos_js=tipos_js, recientes=recientes,
                            hoy=date.today().isoformat())
 
 
@@ -430,7 +436,7 @@ def lotes():
 @rol_requerido(*ROLES_DONACION)
 def lote_nuevo():
     sede = request.form.get("sede", type=int)
-    categoria = request.form.get("categoria", type=int)
+    tipo = request.form.get("tipo", type=int)
     unidad = request.form.get("unidad", type=int)
     descripcion = request.form.get("descripcion", "").strip()
     try:
@@ -443,8 +449,8 @@ def lote_nuevo():
     except ValueError:
         vence = None
 
-    if None in (sede, categoria, unidad) or not descripcion or len(descripcion) > 150:
-        flash("Elige la sede, la categoría y la unidad, y escribe una "
+    if None in (sede, tipo, unidad) or not descripcion or len(descripcion) > 150:
+        flash("Elige la sede, la categoría, el tipo de alimento y la unidad, y escribe una "
               "descripción de máximo 150 letras.", "error")
     elif cantidad is None or cantidad <= 0 or cantidad >= Decimal("100000000"):
         flash("Escribe una cantidad válida, mayor que cero.", "error")
@@ -455,7 +461,7 @@ def lote_nuevo():
         try:
             filas = ejecutar(
                 "CALL registrar_lote(%s, %s, %s, %s, %s, %s, %s, NULL)",
-                (uid, sede, categoria, unidad, descripcion, cantidad, vence),
+                (uid, sede, tipo, unidad, descripcion, cantidad, vence),
                 id_usuario=uid,
             )
             flash(f"Lote #{filas[0]['p_id_lote']} registrado. ¡Gracias por la donación!", "ok")

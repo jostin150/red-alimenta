@@ -25,11 +25,17 @@
   </label>
 
   <label class="campo">Categoría
-    <select name="categoria" required>
+    <select id="categoria" required>
       <option value="">Elige la categoría</option>
       {% for c in categorias %}
         <option value="{{ c.id_categoria }}">{{ c.nombre }}</option>
       {% endfor %}
+    </select>
+  </label>
+
+  <label class="campo">Tipo de alimento
+    <select id="tipo" name="tipo" required disabled>
+      <option value="">Primero elige la categoría</option>
     </select>
   </label>
 
@@ -57,6 +63,28 @@
 
   <button class="boton" type="submit">Registrar lote</button>
 </form>
+
+<script>
+  // Todos los tipos activos, enviados por el servidor
+  const tipos = {{ tipos_js | tojson }};
+  const categoria = document.getElementById('categoria');
+  const tipo = document.getElementById('tipo');
+
+  // Al cambiar la categoría, se llena la lista con los tipos de esa categoría
+  categoria.addEventListener('change', function () {
+    tipo.innerHTML = '';
+    if (!categoria.value) {
+      tipo.add(new Option('Primero elige la categoría', ''));
+      tipo.disabled = true;
+      return;
+    }
+    tipo.add(new Option('Elige el tipo', ''));
+    tipos
+      .filter(function (t) { return String(t.id_categoria) === categoria.value; })
+      .forEach(function (t) { tipo.add(new Option(t.nombre, t.id_tipo)); });
+    tipo.disabled = false;
+  });
+</script>
 {% else %}
   <p class="vacio">Tu usuario todavía no está vinculado a ninguna sede. Pide a un administrador que lo vincule.</p>
 {% endif %}
@@ -79,7 +107,7 @@
       {% for l in recientes %}
         <tr>
           <td data-etiqueta="Lote"><span class="principal">#{{ l.id_lote }}</span></td>
-          <td data-etiqueta="Descripción">{{ l.descripcion }}<span class="secundario">{{ l.categoria }}</span></td>
+          <td data-etiqueta="Descripción">{{ l.descripcion }}<span class="secundario">{{ l.categoria }} · {{ l.tipo }}</span></td>
           <td data-etiqueta="Sede">{{ l.sede }}</td>
           <td data-etiqueta="Cantidad" class="num">{{ ('%.2f' | format(l.cantidad_inicial)) | replace('.', ',') }}<span class="unidad">{{ l.abreviatura }}</span></td>
           <td data-etiqueta="Saldo" class="num">{{ ('%.2f' | format(l.saldo)) | replace('.', ',') }}<span class="unidad">{{ l.abreviatura }}</span></td>
