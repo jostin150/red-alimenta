@@ -136,17 +136,20 @@ def solicitudes():
         pendientes = consultar(
             """
             SELECT s.id_solicitud, s.fecha_solicitud, us.nombre AS beneficiario,
-                   string_agg(c.nombre || ' · ' ||
+                   p.nombre AS punto,
+                   string_agg(t.nombre || ' (' || c.nombre || ') · ' ||
                               replace(round(sd.cantidad_solicitada, 2)::text, '.', ',') ||
-                              ' ' || u.abreviatura, '; ' ORDER BY c.nombre) AS pedido
+                              ' ' || u.abreviatura, '; ' ORDER BY t.nombre) AS pedido
             FROM solicitud s
             JOIN beneficiario b       ON b.id_beneficiario = s.id_beneficiario
             JOIN usuario us           ON us.id_usuario = b.id_usuario
             JOIN solicitud_detalle sd ON sd.id_solicitud = s.id_solicitud
+            JOIN tipo_alimento t      ON t.id_tipo = sd.id_tipo
             JOIN categoria c          ON c.id_categoria = sd.id_categoria
             JOIN unidad u             ON u.id_unidad = sd.id_unidad
+            LEFT JOIN punto_entrega p ON p.id_punto = s.id_punto
             WHERE s.estado = 'pendiente'
-            GROUP BY s.id_solicitud, s.fecha_solicitud, us.nombre
+            GROUP BY s.id_solicitud, s.fecha_solicitud, us.nombre, p.nombre
             ORDER BY s.fecha_solicitud
             """
         )
@@ -155,51 +158,88 @@ def solicitudes():
     if "beneficiario" not in session.get("roles", []):
         abort(403)
 
+    uid = session["id_usuario"]
     propias = consultar(
         """
         SELECT s.id_solicitud, s.fecha_solicitud, s.estado,
-               string_agg(c.nombre || ' · ' ||
+               p.nombre AS punto,
+               string_agg(t.nombre || ' (' || c.nombre || ') · ' ||
                           replace(round(sd.cantidad_solicitada, 2)::text, '.', ',') ||
-                          ' ' || u.abreviatura, '; ' ORDER BY c.nombre) AS pedido
+                          ' ' || u.abreviatura, '; ' ORDER BY t.nombre) AS pedido
         FROM solicitud s
         JOIN beneficiario b       ON b.id_beneficiario = s.id_beneficiario
         JOIN solicitud_detalle sd ON sd.id_solicitud = s.id_solicitud
+        JOIN tipo_alimento t      ON t.id_tipo = sd.id_tipo
         JOIN categoria c          ON c.id_categoria = sd.id_categoria
         JOIN unidad u             ON u.id_unidad = sd.id_unidad
+        LEFT JOIN punto_entrega p ON p.id_punto = s.id_punto
         WHERE b.id_usuario = %s
-        GROUP BY s.id_solicitud, s.fecha_solicitud, s.estado
+        GROUP BY s.id_solicitud, s.fecha_solicitud, s.estado, p.nombre
         ORDER BY s.fecha_solicitud DESC
         LIMIT 20
         """,
-        (session["id_usuario"],),   # siempre de la sesión
+        (uid,),   # siempre de la sesión
     )
-    # Solo ofrecemos lo que hoy tiene inventario: categoría + unidad
-    opciones = consultar(
+
+    # Solo ofrecemos lo que hoy tiene inventario: categoría + tipo + unidad
+    filas = consultar(
         """
         SELECT c.id_categoria, c.nombre AS categoria,
+               t.id_tipo, t.nombre AS tipo,
                u.id_unidad, u.nombre AS unidad, u.abreviatura,
                sum(l.saldo) AS disponible
         FROM lote l
-        JOIN categoria c ON c.id_categoria = l.id_categoria
-        JOIN unidad u    ON u.id_unidad = l.id_unidad
+        JOIN tipo_alimento t ON t.id_tipo = l.id_tipo
+        JOIN categoria c     ON c.id_categoria = l.id_categoria
+        JOIN unidad u        ON u.id_unidad = l.id_unidad
         WHERE l.estado = 'activo' AND l.saldo > 0
           AND l.fecha_vencimiento >= CURRENT_DATE
-        GROUP BY c.id_categoria, c.nombre, u.id_unidad, u.nombre, u.abreviatura
-        ORDER BY c.nombre, u.nombre
+          AND t.activo
+        GROUP BY c.id_categoria, c.nombre, t.id_tipo, t.nombre,
+                 u.id_unidad, u.nombre, u.abreviatura
+        ORDER BY c.nombre, t.nombre, u.nombre
         """
     )
+    # Las categorías para la primera lista (sin repetir)
+    categorias, vistas = [], set()
+    for f in filas:
+        if f["id_categoria"] not in vistas:
+            vistas.add(f["id_categoria"])
+            categorias.append({"id": f["id_categoria"], "nombre": f["categoria"]})
+    # Los tipos para la segunda lista; el navegador los filtra según la categoría
+    opciones_js = [
+        {
+            "id_categoria": f["id_categoria"],
+            "valor": f"{f['id_tipo']}-{f['id_unidad']}",
+            "etiqueta": (f"{f['tipo']} · {f['unidad']} "
+                         f"({f['disponible']:.2f}".replace(".", ",")
+                         + f" {f['abreviatura']} disponibles)"),
+        }
+        for f in filas
+    ]
+
+    # Puntos de entrega; dejamos marcado el de la comuna del beneficiario
+    puntos = consultar(
+        "SELECT id_punto, nombre, direccion, comuna FROM punto_entrega "
+        "WHERE activo ORDER BY comuna, nombre"
+    )
+    ben = consultar("SELECT comuna FROM beneficiario WHERE id_usuario = %s", (uid,))
+    comuna = ben[0]["comuna"] if ben else None
+
     return render_template("solicitudes_beneficiario.html", propias=propias,
-                           opciones=opciones)
+                           categorias=categorias, opciones_js=opciones_js,
+                           puntos=puntos, comuna=comuna)
 
 
 @app.route("/solicitudes/nueva", methods=["POST"])
 @rol_requerido("beneficiario")
 def solicitud_nueva():
-    # La opción llega como "idCategoría-idUnidad", por ejemplo "2-1"
+    # El tipo llega como "idTipo-idUnidad", por ejemplo "12-3"
     try:
-        categoria, unidad = (int(x) for x in request.form.get("opcion", "").split("-"))
+        tipo, unidad = (int(x) for x in request.form.get("opcion", "").split("-"))
     except ValueError:
-        categoria = unidad = None
+        tipo = unidad = None
+    punto = request.form.get("punto", type=int)
     try:
         cantidad = Decimal(request.form.get("cantidad", "").replace(",", ".").strip())
         if not cantidad.is_finite():
@@ -207,16 +247,30 @@ def solicitud_nueva():
     except InvalidOperation:
         cantidad = None
 
-    if categoria is None or unidad is None or cantidad is None:
-        flash("Elige qué necesitas y escribe una cantidad válida.", "error")
+    if tipo is None or unidad is None or cantidad is None or punto is None:
+        flash("Elige la categoría, el tipo de alimento, una cantidad válida "
+              "y el punto de entrega.", "error")
         return redirect(url_for("solicitudes"))
 
     uid = session["id_usuario"]
     try:
-        filas = ejecutar("CALL crear_solicitud(%s, %s, %s, %s, NULL)",
-                         (uid, categoria, unidad, cantidad), id_usuario=uid)
+        filas = ejecutar("CALL crear_solicitud(%s, %s, %s, %s, %s, NULL)",
+                         (uid, tipo, unidad, cantidad, punto), id_usuario=uid)
         flash(f"Solicitud #{filas[0]['p_id_solicitud']} creada. "
               "Un gestor la revisará.", "ok")
+    except ErrorDeNegocio as e:
+        flash(str(e), "error")
+    return redirect(url_for("solicitudes"))
+
+
+@app.route("/solicitudes/<int:id_solicitud>/cancelar", methods=["POST"])
+@rol_requerido("beneficiario")
+def solicitud_cancelar(id_solicitud):
+    uid = session["id_usuario"]   # siempre de la sesión: solo cancelas las TUYAS
+    try:
+        ejecutar("CALL cancelar_solicitud(%s, %s, NULL)",
+                 (id_solicitud, uid), id_usuario=uid)
+        flash(f"Solicitud #{id_solicitud} cancelada.", "ok")
     except ErrorDeNegocio as e:
         flash(str(e), "error")
     return redirect(url_for("solicitudes"))

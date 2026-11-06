@@ -6,29 +6,69 @@
 <section class="encabezado-pagina">
   <h1>Mis solicitudes</h1>
   <p class="resumen">
-    Pide el tipo de alimento que necesitas. Un gestor revisará tu solicitud
-    y reservará el inventario disponible.
+    Elige la categoría y el tipo de alimento que necesitas, y el punto donde
+    vas a recogerlo. Un gestor revisará tu solicitud y reservará el inventario.
   </p>
 </section>
 
-{% if opciones %}
+{% if categorias %}
 <form class="solicitud" method="post" action="{{ url_for('solicitud_nueva') }}">
   <input type="hidden" name="csrf" value="{{ token_csrf() }}">
-  <label class="campo">Qué necesitas
-    <select name="opcion" required>
-      <option value="">Elige un alimento</option>
-      {% for o in opciones %}
-        <option value="{{ o.id_categoria }}-{{ o.id_unidad }}">
-          {{ o.categoria }} · {{ o.unidad }} ({{ ('%.2f' | format(o.disponible)) | replace('.', ',') }} {{ o.abreviatura }} disponibles)
+
+  <label class="campo">1. Categoría
+    <select id="categoria" required>
+      <option value="">Elige una categoría</option>
+      {% for c in categorias %}
+        <option value="{{ c.id }}">{{ c.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="campo">2. Tipo de alimento
+    <select id="tipo" name="opcion" required disabled>
+      <option value="">Primero elige la categoría</option>
+    </select>
+  </label>
+
+  <label class="campo">3. Cantidad
+    <input type="number" name="cantidad" min="0.01" step="0.01" inputmode="decimal" required>
+  </label>
+
+  <label class="campo">4. Punto de entrega
+    <select name="punto" required>
+      <option value="">Elige dónde recogerás</option>
+      {% for p in puntos %}
+        <option value="{{ p.id_punto }}" {% if p.comuna == comuna %}selected{% endif %}>
+          {{ p.nombre }} · {{ p.direccion }}
         </option>
       {% endfor %}
     </select>
   </label>
-  <label class="campo">Cantidad
-    <input type="number" name="cantidad" min="0.01" step="0.01" inputmode="decimal" required>
-  </label>
+
   <button class="boton" type="submit">Enviar solicitud</button>
 </form>
+
+<script>
+  // Los tipos disponibles, enviados por el servidor
+  const opciones = {{ opciones_js | tojson }};
+  const categoria = document.getElementById('categoria');
+  const tipo = document.getElementById('tipo');
+
+  // Cuando cambia la categoría, se llena la lista de tipos de esa categoría
+  categoria.addEventListener('change', function () {
+    tipo.innerHTML = '';
+    if (!categoria.value) {
+      tipo.add(new Option('Primero elige la categoría', ''));
+      tipo.disabled = true;
+      return;
+    }
+    tipo.add(new Option('Elige el tipo', ''));
+    opciones
+      .filter(function (o) { return String(o.id_categoria) === categoria.value; })
+      .forEach(function (o) { tipo.add(new Option(o.etiqueta, o.valor)); });
+    tipo.disabled = false;
+  });
+</script>
 {% else %}
   <p class="vacio">Por ahora no hay inventario disponible para solicitar. Vuelve a intentarlo más tarde.</p>
 {% endif %}
@@ -40,8 +80,10 @@
       <tr>
         <th scope="col">Solicitud</th>
         <th scope="col">Pedido</th>
+        <th scope="col">Punto de entrega</th>
         <th scope="col">Fecha</th>
         <th scope="col">Estado</th>
+        <th scope="col">Acción</th>
       </tr>
     </thead>
     <tbody>
@@ -49,8 +91,20 @@
         <tr>
           <td data-etiqueta="Solicitud"><span class="principal">#{{ s.id_solicitud }}</span></td>
           <td data-etiqueta="Pedido">{{ s.pedido }}</td>
+          <td data-etiqueta="Punto">{{ s.punto or '—' }}</td>
           <td data-etiqueta="Fecha">{{ s.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
           <td data-etiqueta="Estado"><span class="estado estado-{{ s.estado }}">{{ s.estado }}</span></td>
+          <td data-etiqueta="Acción" class="acciones">
+            {% if s.estado in ('pendiente', 'reservada') %}
+              <form method="post" action="{{ url_for('solicitud_cancelar', id_solicitud=s.id_solicitud) }}"
+                    onsubmit="return confirm('¿Seguro que quieres cancelar esta solicitud?');">
+                <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+                <button class="boton-chico boton-borde" type="submit">Cancelar</button>
+              </form>
+            {% else %}
+              —
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
     </tbody>

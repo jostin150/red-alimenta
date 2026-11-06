@@ -21,6 +21,7 @@
         <th scope="col">Solicitud</th>
         <th scope="col">Beneficiario</th>
         <th scope="col">Pedido</th>
+        <th scope="col">Punto de entrega</th>
         <th scope="col">Fecha</th>
         <th scope="col">Acción</th>
       </tr>
@@ -31,6 +32,7 @@
           <td data-etiqueta="Solicitud"><span class="principal">#{{ s.id_solicitud }}</span></td>
           <td data-etiqueta="Beneficiario">{{ s.beneficiario }}</td>
           <td data-etiqueta="Pedido">{{ s.pedido }}</td>
+          <td data-etiqueta="Punto">{{ s.punto or '—' }}</td>
           <td data-etiqueta="Fecha">{{ s.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
           <td data-etiqueta="Acción">
             <form method="post" action="{{ url_for('solicitud_reservar', id_solicitud=s.id_solicitud) }}">
