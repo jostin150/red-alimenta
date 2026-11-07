@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, redirect, render_template, request,
                    session, url_for)
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from auth import login_requerido, rol_requerido
 from db import ErrorDeNegocio, consultar, ejecutar
@@ -160,13 +160,13 @@ def inicio():
             "titulo": "Administración",
             "texto": "Resumen general de la red.",
             "tarjetas": [
-                {"etiqueta": "Usuarios activos", "enlace": None, "urgente": False,
+                {"etiqueta": "Usuarios activos", "enlace": "admin_usuarios", "urgente": False,
                  "valor": contar("SELECT count(*) FROM usuario WHERE activo")},
                 {"etiqueta": "Beneficiarios activos", "enlace": None, "urgente": False,
                  "valor": contar("SELECT count(*) FROM beneficiario WHERE estado = 'activo'")},
                 {"etiqueta": "Donantes activos", "enlace": None, "urgente": False,
                  "valor": contar("SELECT count(*) FROM donante WHERE activo")},
-                {"etiqueta": "Puntos de entrega", "enlace": None, "urgente": False,
+                {"etiqueta": "Puntos de entrega", "enlace": "admin_catalogos", "urgente": False,
                  "valor": contar("SELECT count(*) FROM punto_entrega WHERE activo")},
                 {"etiqueta": "Lotes con inventario", "enlace": "inventario", "urgente": False,
                  "valor": contar("""SELECT count(*) FROM lote
@@ -545,6 +545,140 @@ def entregas():
         """
     )
     return render_template("entregas.html", filas=con_detalle(filas))
+
+
+# ---------------------------------------------------------------------------
+# Administración (solo administrador): catálogos, usuarios y roles
+# ---------------------------------------------------------------------------
+def _admin_llamar(sql, params, mensaje_ok, destino):
+    """Llama a un procedimiento de administración. Quien lo ejecuta sale
+    SIEMPRE de la sesión (nunca del formulario) y es el primer parámetro."""
+    uid = session["id_usuario"]
+    try:
+        ejecutar(sql, (uid,) + params, id_usuario=uid)
+        flash(mensaje_ok, "ok")
+    except ErrorDeNegocio as e:
+        flash(str(e), "error")
+    return redirect(url_for(destino))
+
+
+@app.route("/admin/catalogos")
+@rol_requerido("administrador")
+def admin_catalogos():
+    return render_template(
+        "admin_catalogos.html",
+        categorias=consultar("SELECT id_categoria, nombre FROM categoria ORDER BY nombre"),
+        tipos=consultar(
+            """SELECT t.id_tipo, t.nombre, t.activo, c.nombre AS categoria
+               FROM tipo_alimento t JOIN categoria c ON c.id_categoria = t.id_categoria
+               ORDER BY c.nombre, t.nombre"""),
+        unidades=consultar("SELECT id_unidad, nombre, abreviatura FROM unidad ORDER BY nombre"),
+        puntos=consultar(
+            "SELECT id_punto, nombre, direccion, comuna, activo FROM punto_entrega ORDER BY nombre"),
+    )
+
+
+@app.route("/admin/categoria", methods=["POST"])
+@rol_requerido("administrador")
+def admin_categoria():
+    return _admin_llamar(
+        "CALL admin_guardar_categoria(%s, %s, %s)",
+        (request.form.get("id", type=int), request.form.get("nombre", "")),
+        "Categoría guardada.", "admin_catalogos")
+
+
+@app.route("/admin/tipo", methods=["POST"])
+@rol_requerido("administrador")
+def admin_tipo():
+    return _admin_llamar(
+        "CALL admin_guardar_tipo(%s, %s, %s, %s, %s)",
+        (request.form.get("id", type=int), request.form.get("id_categoria", type=int),
+         request.form.get("nombre", ""), "activo" in request.form),
+        "Tipo de alimento guardado.", "admin_catalogos")
+
+
+@app.route("/admin/unidad", methods=["POST"])
+@rol_requerido("administrador")
+def admin_unidad():
+    return _admin_llamar(
+        "CALL admin_guardar_unidad(%s, %s, %s, %s)",
+        (request.form.get("id", type=int), request.form.get("nombre", ""),
+         request.form.get("abreviatura", "")),
+        "Unidad guardada.", "admin_catalogos")
+
+
+@app.route("/admin/punto", methods=["POST"])
+@rol_requerido("administrador")
+def admin_punto():
+    return _admin_llamar(
+        "CALL admin_guardar_punto(%s, %s, %s, %s, %s, %s)",
+        (request.form.get("id", type=int), request.form.get("nombre", ""),
+         request.form.get("direccion", ""), request.form.get("comuna", ""),
+         "activo" in request.form),
+        "Punto de entrega guardado.", "admin_catalogos")
+
+
+@app.route("/admin/usuarios")
+@rol_requerido("administrador")
+def admin_usuarios():
+    q = request.args.get("q", "").strip()
+    usuarios = consultar(
+        """
+        SELECT u.id_usuario, u.nombre, u.correo, u.activo,
+               array_remove(array_agg(r.nombre ORDER BY r.nombre), NULL) AS roles,
+               d.nombre AS donante
+        FROM usuario u
+        LEFT JOIN usuario_rol ur     ON ur.id_usuario = u.id_usuario
+        LEFT JOIN rol r              ON r.id_rol = ur.id_rol
+        LEFT JOIN usuario_donante ud ON ud.id_usuario = u.id_usuario
+        LEFT JOIN donante d          ON d.id_donante = ud.id_donante
+        WHERE %s = '' OR u.nombre ILIKE %s OR u.correo ILIKE %s
+        GROUP BY u.id_usuario, d.nombre
+        ORDER BY u.activo DESC, u.nombre
+        LIMIT 100
+        """,
+        (q, f"%{q}%", f"%{q}%"),
+    )
+    donantes = consultar("SELECT id_donante, nombre FROM donante WHERE activo ORDER BY nombre")
+    return render_template("admin_usuarios.html", usuarios=usuarios,
+                           donantes=donantes, q=q,
+                           roles_asignables=["administrador", "gestor", "donante"])
+
+
+@app.route("/admin/usuarios/crear", methods=["POST"])
+@rol_requerido("administrador")
+def admin_usuario_crear():
+    clave = request.form.get("clave", "")
+    if len(clave) < 8:
+        flash("La contraseña debe tener al menos 8 caracteres.", "error")
+        return redirect(url_for("admin_usuarios"))
+    return _admin_llamar(
+        "CALL admin_crear_usuario(%s, %s, %s, %s, %s, %s, NULL)",
+        (request.form.get("nombre", ""), request.form.get("correo", ""),
+         generate_password_hash(clave), request.form.get("rol", ""),
+         request.form.get("id_donante", type=int)),
+        "Usuario creado.", "admin_usuarios")
+
+
+@app.route("/admin/usuarios/<int:id_usuario>/estado", methods=["POST"])
+@rol_requerido("administrador")
+def admin_usuario_estado(id_usuario):
+    activo = request.form.get("activo") == "1"
+    return _admin_llamar(
+        "CALL admin_estado_usuario(%s, %s, %s)", (id_usuario, activo),
+        "Usuario activado." if activo else "Usuario desactivado.", "admin_usuarios")
+
+
+@app.route("/admin/usuarios/<int:id_usuario>/rol", methods=["POST"])
+@rol_requerido("administrador")
+def admin_usuario_rol(id_usuario):
+    rol = request.form.get("rol", "")
+    if request.form.get("accion") == "quitar":
+        return _admin_llamar("CALL admin_quitar_rol(%s, %s, %s)", (id_usuario, rol),
+                             "Rol quitado.", "admin_usuarios")
+    return _admin_llamar("CALL admin_asignar_rol(%s, %s, %s, %s)",
+                         (id_usuario, rol, request.form.get("id_donante", type=int)),
+                         "Rol asignado.", "admin_usuarios")
 
 
 # ---------------------------------------------------------------------------

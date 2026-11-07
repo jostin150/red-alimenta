@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block titulo %}Usuarios · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<style>
+  .entrada { padding: 0.45rem 0.6rem; border: 2px solid var(--menta); border-radius: 0.6rem;
+             font: inherit; max-width: 100%; background: #fff; color: var(--bosque); }
+  .fila-mini { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.4rem; }
+  .fila-mini form { display: inline-flex; gap: 0.4rem; align-items: center; }
+  .etiqueta-rol { display: inline-block; padding: 0.1rem 0.6rem; margin: 0 0.3rem 0.3rem 0;
+                  background: var(--menta); border-radius: 999px; font-size: 0.88rem; }
+  .nota { color: var(--tinta-suave); }
+</style>
+
+<section class="encabezado-pagina">
+  <h1>Usuarios y roles</h1>
+  <p class="resumen">Crea usuarios, actívalos o desactívalos y asígnales roles. Los beneficiarios se registran aparte (con su documento y consentimiento), por eso su rol no se asigna ni se quita aquí.</p>
+</section>
+
+<form class="solicitud" method="get" action="{{ url_for('admin_usuarios') }}">
+  <label class="campo">Buscar por nombre o correo
+    <input type="search" name="q" value="{{ q }}">
+  </label>
+  <button class="boton" type="submit">Buscar</button>
+</form>
+
+<h2 class="subtitulo">Crear usuario</h2>
+<form class="solicitud" method="post" action="{{ url_for('admin_usuario_crear') }}">
+  <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+  <label class="campo">Nombre
+    <input type="text" name="nombre" maxlength="100" required>
+  </label>
+  <label class="campo">Correo
+    <input type="email" name="correo" maxlength="150" required>
+  </label>
+  <label class="campo">Contraseña (mínimo 8 caracteres)
+    <input type="password" name="clave" minlength="8" required autocomplete="new-password">
+  </label>
+  <label class="campo">Rol
+    <select name="rol" required>
+      <option value="">Elige el rol</option>
+      {% for r in roles_asignables %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="campo">Organización (solo para donante)
+    <select name="id_donante">
+      <option value="">—</option>
+      {% for d in donantes %}<option value="{{ d.id_donante }}">{{ d.nombre }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="boton" type="submit">Crear usuario</button>
+</form>
+
+<h2 class="subtitulo">Usuarios ({{ usuarios|length }})</h2>
+{% if usuarios %}
+  <table class="lotes">
+    <thead>
+      <tr>
+        <th scope="col">Usuario</th>
+        <th scope="col">Roles</th>
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+        <tr>
+          <td data-etiqueta="Usuario">
+            <span>
+              <span class="principal">{{ u.nombre }}</span>
+              <span class="secundario">{{ u.correo }}</span>
+              {% if u.donante %}<span class="secundario">Organización: {{ u.donante }}</span>{% endif %}
+            </span>
+          </td>
+          <td data-etiqueta="Roles">
+            <span>
+              {% for r in u.roles %}
+                <span class="etiqueta-rol">{{ r }}</span>
+              {% else %}
+                <span class="secundario">Sin roles</span>
+              {% endfor %}
+
+              <span class="fila-mini">
+                {% for r in roles_asignables if r in u.roles %}
+                  <form method="post" action="{{ url_for('admin_usuario_rol', id_usuario=u.id_usuario) }}"
+                        onsubmit="return confirm('¿Quitar el rol {{ r }} a {{ u.nombre }}?');">
+                    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+                    <input type="hidden" name="accion" value="quitar">
+                    <input type="hidden" name="rol" value="{{ r }}">
+                    <button class="boton-chico boton-borde" type="submit">Quitar {{ r }}</button>
+                  </form>
+                {% endfor %}
+              </span>
+
+              <span class="fila-mini">
+                <form method="post" action="{{ url_for('admin_usuario_rol', id_usuario=u.id_usuario) }}">
+                  <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+                  <input type="hidden" name="accion" value="agregar">
+                  <select class="entrada" name="rol" required>
+                    <option value="">Agregar rol…</option>
+                    {% for r in roles_asignables if r not in u.roles %}
+                      <option value="{{ r }}">{{ r }}</option>
+                    {% endfor %}
+                  </select>
+                  <select class="entrada" name="id_donante" aria-label="Organización (solo para donante)">
+                    <option value="">Organización…</option>
+                    {% for d in donantes %}<option value="{{ d.id_donante }}">{{ d.nombre }}</option>{% endfor %}
+                  </select>
+                  <button class="boton-chico" type="submit">Agregar</button>
+                </form>
+              </span>
+            </span>
+          </td>
+          <td data-etiqueta="Estado" class="acciones">
+            <span>
+              <span class="estado estado-{{ 'activo' if u.activo else 'inactivo' }}">{{ 'activo' if u.activo else 'inactivo' }}</span>
+              <form method="post" action="{{ url_for('admin_usuario_estado', id_usuario=u.id_usuario) }}">
+                <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+                <input type="hidden" name="activo" value="{{ '0' if u.activo else '1' }}">
+                <button class="boton-chico boton-borde" type="submit">{{ 'Desactivar' if u.activo else 'Activar' }}</button>
+              </form>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="nota">Se muestran hasta 100 usuarios. Usa el buscador para encontrar a alguien en particular.</p>
+{% else %}
+  <p class="vacio">No se encontraron usuarios.</p>
+{% endif %}
+{% endblock %}

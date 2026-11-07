@@ -40,6 +40,10 @@
             <a href="{{ url_for('reservas') }}" {% if request.endpoint == 'reservas' %}aria-current="page"{% endif %}>Reservas</a>
             <a href="{{ url_for('entregas') }}" {% if request.endpoint == 'entregas' %}aria-current="page"{% endif %}>Entregas</a>
           {% endif %}
+          {% if 'administrador' in roles %}
+            <a href="{{ url_for('admin_catalogos') }}" {% if request.endpoint == 'admin_catalogos' %}aria-current="page"{% endif %}>Catálogos</a>
+            <a href="{{ url_for('admin_usuarios') }}" {% if request.endpoint == 'admin_usuarios' %}aria-current="page"{% endif %}>Usuarios</a>
+          {% endif %}
           <form method="post" action="{{ url_for('salir') }}">
             <input type="hidden" name="csrf" value="{{ token_csrf() }}">
             <button type="submit">Salir ({{ session['nombre'] }})</button>

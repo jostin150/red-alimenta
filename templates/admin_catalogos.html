@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block titulo %}Catálogos · Red Alimenta{% endblock %}
+
+{% block contenido %}
+<style>
+  .entrada { padding: 0.45rem 0.6rem; border: 2px solid var(--menta); border-radius: 0.6rem;
+             font: inherit; max-width: 100%; background: #fff; color: var(--bosque); }
+  .seccion-admin { margin-top: 2.2rem; }
+  .seccion-admin h2 { font-family: var(--display); margin: 0 0 0.3rem; }
+  .nota { color: var(--tinta-suave); margin: 0 0 1rem; }
+</style>
+
+<section class="encabezado-pagina">
+  <h1>Catálogos</h1>
+  <p class="resumen">Aquí el administrador agrega y corrige las listas que usa toda la aplicación.</p>
+</section>
+
+{# ================= CATEGORÍAS ================= #}
+<section class="seccion-admin">
+  <h2>Categorías</h2>
+  <p class="nota">Son los grupos grandes de alimentos (Bebidas, Lácteos…).</p>
+  <table class="lotes">
+    <thead><tr><th scope="col">Nombre</th><th scope="col">Acción</th></tr></thead>
+    <tbody>
+      {% for c in categorias %}
+        <tr>
+          <td data-etiqueta="Nombre">
+            <input class="entrada" name="nombre" value="{{ c.nombre }}" maxlength="60" required form="cat-{{ c.id_categoria }}">
+          </td>
+          <td data-etiqueta="Acción" class="acciones">
+            <form id="cat-{{ c.id_categoria }}" method="post" action="{{ url_for('admin_categoria') }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="hidden" name="id" value="{{ c.id_categoria }}">
+              <button class="boton-chico" type="submit">Guardar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="solicitud" method="post" action="{{ url_for('admin_categoria') }}">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+    <label class="campo">Nueva categoría
+      <input type="text" name="nombre" maxlength="60" required>
+    </label>
+    <button class="boton" type="submit">Agregar categoría</button>
+  </form>
+</section>
+
+{# ================= TIPOS ================= #}
+<section class="seccion-admin">
+  <h2>Tipos de alimento</h2>
+  <p class="nota">Lo específico que elige el beneficiario (Agua, Gaseosa…). Cada tipo pertenece a una categoría y esa categoría no se puede cambiar después. Un tipo desactivado deja de aparecer en los formularios.</p>
+  <table class="lotes">
+    <thead><tr><th scope="col">Categoría</th><th scope="col">Tipo</th><th scope="col">Activo</th><th scope="col">Acción</th></tr></thead>
+    <tbody>
+      {% for t in tipos %}
+        <tr>
+          <td data-etiqueta="Categoría">{{ t.categoria }}</td>
+          <td data-etiqueta="Tipo">
+            <input class="entrada" name="nombre" value="{{ t.nombre }}" maxlength="80" required form="tipo-{{ t.id_tipo }}">
+          </td>
+          <td data-etiqueta="Activo">
+            <input type="checkbox" name="activo" {% if t.activo %}checked{% endif %} form="tipo-{{ t.id_tipo }}">
+          </td>
+          <td data-etiqueta="Acción" class="acciones">
+            <form id="tipo-{{ t.id_tipo }}" method="post" action="{{ url_for('admin_tipo') }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="hidden" name="id" value="{{ t.id_tipo }}">
+              <button class="boton-chico" type="submit">Guardar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="solicitud" method="post" action="{{ url_for('admin_tipo') }}">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+    <input type="hidden" name="activo" value="1">
+    <label class="campo">Categoría
+      <select name="id_categoria" required>
+        <option value="">Elige la categoría</option>
+        {% for c in categorias %}<option value="{{ c.id_categoria }}">{{ c.nombre }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="campo">Nuevo tipo
+      <input type="text" name="nombre" maxlength="80" required>
+    </label>
+    <button class="boton" type="submit">Agregar tipo</button>
+  </form>
+</section>
+
+{# ================= UNIDADES ================= #}
+<section class="seccion-admin">
+  <h2>Unidades</h2>
+  <p class="nota">Cómo se mide la cantidad (kilogramo, litro…).</p>
+  <table class="lotes">
+    <thead><tr><th scope="col">Nombre</th><th scope="col">Abreviatura</th><th scope="col">Acción</th></tr></thead>
+    <tbody>
+      {% for u in unidades %}
+        <tr>
+          <td data-etiqueta="Nombre"><input class="entrada" name="nombre" value="{{ u.nombre }}" maxlength="30" required form="uni-{{ u.id_unidad }}"></td>
+          <td data-etiqueta="Abreviatura"><input class="entrada" name="abreviatura" value="{{ u.abreviatura }}" maxlength="10" required size="6" form="uni-{{ u.id_unidad }}"></td>
+          <td data-etiqueta="Acción" class="acciones">
+            <form id="uni-{{ u.id_unidad }}" method="post" action="{{ url_for('admin_unidad') }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="hidden" name="id" value="{{ u.id_unidad }}">
+              <button class="boton-chico" type="submit">Guardar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="solicitud" method="post" action="{{ url_for('admin_unidad') }}">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+    <label class="campo">Nueva unidad
+      <input type="text" name="nombre" maxlength="30" required>
+    </label>
+    <label class="campo">Abreviatura
+      <input type="text" name="abreviatura" maxlength="10" required>
+    </label>
+    <button class="boton" type="submit">Agregar unidad</button>
+  </form>
+</section>
+
+{# ================= PUNTOS DE ENTREGA ================= #}
+<section class="seccion-admin">
+  <h2>Puntos de entrega</h2>
+  <p class="nota">Sitios donde los beneficiarios recogen su alimento. Un punto desactivado deja de ofrecerse.</p>
+  <table class="lotes">
+    <thead><tr><th scope="col">Nombre</th><th scope="col">Dirección</th><th scope="col">Comuna</th><th scope="col">Activo</th><th scope="col">Acción</th></tr></thead>
+    <tbody>
+      {% for p in puntos %}
+        <tr>
+          <td data-etiqueta="Nombre"><input class="entrada" name="nombre" value="{{ p.nombre }}" maxlength="100" required form="pun-{{ p.id_punto }}"></td>
+          <td data-etiqueta="Dirección"><input class="entrada" name="direccion" value="{{ p.direccion }}" maxlength="200" required form="pun-{{ p.id_punto }}"></td>
+          <td data-etiqueta="Comuna"><input class="entrada" name="comuna" value="{{ p.comuna or '' }}" maxlength="60" form="pun-{{ p.id_punto }}"></td>
+          <td data-etiqueta="Activo"><input type="checkbox" name="activo" {% if p.activo %}checked{% endif %} form="pun-{{ p.id_punto }}"></td>
+          <td data-etiqueta="Acción" class="acciones">
+            <form id="pun-{{ p.id_punto }}" method="post" action="{{ url_for('admin_punto') }}">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="hidden" name="id" value="{{ p.id_punto }}">
+              <button class="boton-chico" type="submit">Guardar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="solicitud" method="post" action="{{ url_for('admin_punto') }}">
+    <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+    <input type="hidden" name="activo" value="1">
+    <label class="campo">Nuevo punto
+      <input type="text" name="nombre" maxlength="100" required>
+    </label>
+    <label class="campo">Dirección
+      <input type="text" name="direccion" maxlength="200" required>
+    </label>
+    <label class="campo">Comuna (opcional)
+      <input type="text" name="comuna" maxlength="60">
+    </label>
+    <button class="boton" type="submit">Agregar punto</button>
+  </form>
+</section>
+{% endblock %}
