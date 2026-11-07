@@ -101,14 +101,15 @@ AS $$
 DECLARE
   v_estado_sol  VARCHAR(15);
   v_estado_ben  VARCHAR(15);
+  v_consent     BOOLEAN;
   d             RECORD;
   l             RECORD;
   v_falta       NUMERIC(10,2);
   v_toma        NUMERIC(10,2);
   v_hay_detalle BOOLEAN := FALSE;
 BEGIN
-  SELECT s.estado, b.estado
-    INTO v_estado_sol, v_estado_ben
+  SELECT s.estado, b.estado, b.consentimiento
+    INTO v_estado_sol, v_estado_ben, v_consent
   FROM solicitud s
   JOIN beneficiario b ON b.id_beneficiario = s.id_beneficiario
   WHERE s.id_solicitud = p_id_solicitud
@@ -125,6 +126,10 @@ BEGIN
 
   IF v_estado_ben <> 'activo' THEN
     RAISE EXCEPTION 'El beneficiario de la solicitud % no está activo', p_id_solicitud;
+  END IF;
+
+  IF NOT v_consent THEN
+    RAISE EXCEPTION 'El beneficiario de la solicitud % no ha dado su consentimiento', p_id_solicitud;
   END IF;
 
   INSERT INTO reserva (id_solicitud)
@@ -182,6 +187,12 @@ BEGIN
   UPDATE solicitud SET estado = 'reservada' WHERE id_solicitud = p_id_solicitud;
 END;
 $$;
+
+-- CREATE OR REPLACE borra los atributos anteriores del procedimiento, y la
+-- migración 009 le había puesto SECURITY DEFINER. Se lo devolvemos; sin esto,
+-- la app recibe "no tienes permiso" al reservar.
+ALTER PROCEDURE reservar_inventario(INT, INT, INT)
+  SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- ============================================================
 -- 3. cancelar_solicitud: la cancela el PROPIO beneficiario
