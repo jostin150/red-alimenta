@@ -55,7 +55,7 @@ $BODY$;
 
 GRANT EXECUTE ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) TO alimenta_app;
 
-GRANT EXECUTE ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) TO alimenta_user;
+-- (Se quitó el GRANT al rol alimenta_user: ese rol no existe en una instalación nueva.)
 
 REVOKE ALL ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) FROM PUBLIC;
 
