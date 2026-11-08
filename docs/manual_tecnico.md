@@ -65,7 +65,7 @@ red-alimenta/
 | `DB_PORT` | Puerto | `5432` |
 | `DB_NAME` | Nombre de la base | `alimenta` |
 | `DB_USER` | Rol con el que entra la aplicación | `alimenta_app` |
-| `DB_PASSWORD` | Contraseña de ese rol | (la que definiste) |
+| `DB_PASSWORD` | Contraseña de ese rol | (La definida en Pgadmin) |
 | `SECRET_KEY` | Llave que firma la sesión. Obligatoria: sin ella la aplicación no arranca | `python -c "import secrets; print(secrets.token_hex(32))"` |
 
 El `.env` está en `.gitignore`: nunca se sube al repositorio.
