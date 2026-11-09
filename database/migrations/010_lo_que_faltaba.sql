@@ -1,8 +1,5 @@
 BEGIN;
 
--- ============================================================
--- 1. ESTRUCTURA NUEVA
--- ============================================================
 CREATE TABLE punto_entrega (
   id_punto  INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   nombre    VARCHAR(100) NOT NULL UNIQUE,
@@ -20,9 +17,6 @@ ALTER TABLE beneficiario
   ADD CONSTRAINT ck_consentimiento_fecha
     CHECK (NOT consentimiento OR fecha_consentimiento IS NOT NULL);
 
--- ============================================================
--- 2. MARCAR LOTES VENCIDOS (registra la pérdida)
--- ============================================================
 CREATE OR REPLACE PROCEDURE marcar_lotes_vencidos(
   p_id_usuario INT,
   INOUT p_lotes_marcados INT DEFAULT 0
@@ -66,9 +60,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 3. CONFIRMAR ENTREGA, ahora con punto de entrega
--- ============================================================
 DROP PROCEDURE IF EXISTS confirmar_entrega(INT, INT, VARCHAR, INT);
 
 CREATE OR REPLACE PROCEDURE confirmar_entrega(
@@ -154,9 +145,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 4. RESERVAR INVENTARIO, ahora exige consentimiento
--- ============================================================
 CREATE OR REPLACE PROCEDURE reservar_inventario(
   p_id_solicitud INT,
   p_id_usuario   INT,
@@ -256,9 +244,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 5. HISTORIAL PROTEGIDO (RN-10)
--- ============================================================
 CREATE OR REPLACE FUNCTION impedir_borrado()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -299,9 +284,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- ============================================================
--- 6. PERMISOS
--- ============================================================
 GRANT SELECT, INSERT, UPDATE ON punto_entrega TO alimenta_app;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO alimenta_app;
 

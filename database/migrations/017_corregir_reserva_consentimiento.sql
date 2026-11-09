@@ -1,14 +1,4 @@
--- 017: corrección de reservar_inventario
---
--- Por qué: la migración 014 reemplazó reservar_inventario con una versión que
--- había perdido una regla de la migración 010: no se puede reservar para un
--- beneficiario que NO ha dado su consentimiento de datos.
--- Esta migración devuelve esa regla y deja el procedimiento con
--- SECURITY DEFINER desde su definición.
---
--- Ejecutar UNA sola vez, en el Query Tool de la base "alimenta", solo si ya
--- ejecutaste la 014 ANTES de esta corrección. (Si instalas desde cero con el
--- archivo 014 corregido, no la necesitas, pero ejecutarla no hace daño.)
+
 BEGIN;
 
 CREATE OR REPLACE PROCEDURE reservar_inventario(

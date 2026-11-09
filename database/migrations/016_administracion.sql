@@ -1,18 +1,6 @@
--- 016: administración (solo para el rol "administrador")
---      catálogos (categorías, tipos, unidades, puntos de entrega),
---      usuarios y roles.
---
--- Requiere haber ejecutado antes de la 001 a la 015.
--- Ejecutar UNA sola vez, en el Query Tool de la base "alimenta".
---
--- Idea de seguridad: la aplicación NO escribe directamente en estas tablas.
--- Todo pasa por procedimientos que primero comprueban que quien los llama
--- es un administrador activo (igual que hacen los demás procedimientos).
+
 BEGIN;
 
--- ============================================================
--- 0. Comprobación común: "¿quien llama es administrador activo?"
--- ============================================================
 CREATE OR REPLACE FUNCTION public.verificar_admin(p_id_usuario INT)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -33,10 +21,6 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.verificar_admin(INT) FROM PUBLIC;
 
--- ============================================================
--- 1. CATEGORÍAS
--- p_id NULL = crear una nueva; p_id con valor = cambiarle el nombre.
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.admin_guardar_categoria(
   p_admin  INT,
   p_id     INT,
@@ -64,11 +48,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 2. TIPOS DE ALIMENTO
--- Al editar solo se cambia el nombre y si está activo. La categoría de un
--- tipo no se cambia (los lotes ya guardados dependen de ella).
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.admin_guardar_tipo(
   p_admin        INT,
   p_id           INT,
@@ -103,10 +82,6 @@ BEGIN
   END IF;
 END;
 $$;
-
--- ============================================================
--- 3. UNIDADES
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.admin_guardar_unidad(
   p_admin       INT,
   p_id          INT,
@@ -137,9 +112,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 4. PUNTOS DE ENTREGA
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.admin_guardar_punto(
   p_admin     INT,
   p_id        INT,
@@ -176,11 +148,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 5. USUARIOS
--- Roles que se pueden dar aquí: administrador, gestor y donante.
--- Los beneficiarios se registran con su documento y consentimiento, no aquí.
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.admin_crear_usuario(
   p_admin         INT,
   p_nombre        VARCHAR,
@@ -232,7 +199,6 @@ BEGIN
 END;
 $$;
 
--- Activar o desactivar un usuario (no se borra: se conserva el historial).
 CREATE OR REPLACE PROCEDURE public.admin_estado_usuario(
   p_admin      INT,
   p_id_usuario INT,
@@ -269,7 +235,6 @@ BEGIN
 END;
 $$;
 
--- Agregar un rol a un usuario.
 CREATE OR REPLACE PROCEDURE public.admin_asignar_rol(
   p_admin      INT,
   p_id_usuario INT,
@@ -311,7 +276,6 @@ BEGIN
 END;
 $$;
 
--- Quitar un rol a un usuario.
 CREATE OR REPLACE PROCEDURE public.admin_quitar_rol(
   p_admin      INT,
   p_id_usuario INT,
@@ -355,9 +319,6 @@ BEGIN
 END;
 $$;
 
--- ============================================================
--- 6. PERMISOS: la app solo puede LLAMAR a estos procedimientos
--- ============================================================
 REVOKE ALL ON PROCEDURE public.admin_guardar_categoria(INT, INT, VARCHAR) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE public.admin_guardar_tipo(INT, INT, INT, VARCHAR, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE public.admin_guardar_unidad(INT, INT, VARCHAR, VARCHAR) FROM PUBLIC;
@@ -376,10 +337,6 @@ GRANT EXECUTE ON PROCEDURE public.admin_estado_usuario(INT, INT, BOOLEAN) TO ali
 GRANT EXECUTE ON PROCEDURE public.admin_asignar_rol(INT, INT, VARCHAR, INT) TO alimenta_app;
 GRANT EXECUTE ON PROCEDURE public.admin_quitar_rol(INT, INT, VARCHAR) TO alimenta_app;
 
--- ============================================================
--- 7. AUDITORÍA: quedan registrados los cambios de catálogos
---    (la tabla usuario NO se audita aquí porque guarda contraseñas)
--- ============================================================
 DROP TRIGGER IF EXISTS trg_auditoria_categoria ON categoria;
 CREATE TRIGGER trg_auditoria_categoria
 AFTER INSERT OR UPDATE ON categoria

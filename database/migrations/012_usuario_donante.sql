@@ -1,12 +1,6 @@
--- 012: vincula cada usuario con rol "donante" a su organización donante
---      y hace que registrar_lote solo deje registrar en SUS sedes.
---
--- Antes: un usuario "donante" podía registrar un lote en la sede de
--- cualquier otro donante, porque nada decía a qué donante pertenecía.
+
 BEGIN;
 
--- Un usuario pertenece a UN donante (llave primaria = id_usuario).
--- Un donante puede tener varios usuarios.
 CREATE TABLE usuario_donante (
   id_usuario INT PRIMARY KEY REFERENCES usuario(id_usuario),
   id_donante INT NOT NULL REFERENCES donante(id_donante)
@@ -16,8 +10,6 @@ CREATE INDEX idx_usuario_donante_donante ON usuario_donante (id_donante);
 
 GRANT SELECT ON usuario_donante TO alimenta_app;
 
--- Misma firma que en la migración 009 (por eso conserva sus permisos),
--- con una regla nueva: un donante solo registra en sedes de su organización.
 CREATE OR REPLACE PROCEDURE registrar_lote(
   p_id_usuario        INT,
   p_id_sede           INT,
@@ -33,7 +25,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  -- 1) Debe ser un usuario activo con un rol autorizado
+
   IF NOT EXISTS (
     SELECT 1
     FROM usuario u
@@ -46,8 +38,6 @@ BEGIN
     RAISE EXCEPTION 'El usuario % no tiene permiso para registrar lotes', p_id_usuario;
   END IF;
 
-  -- 2) Si NO es gestor ni administrador (o sea, es solo donante),
-  --    la sede debe ser de su propio donante.
   IF NOT EXISTS (
     SELECT 1
     FROM usuario_rol ur

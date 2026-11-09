@@ -1,9 +1,6 @@
 BEGIN;
 
--- ============================================================
---  saldo de un lote en una fecha
--- Sumar lo que entró y lo liberado, y resta lo reservado y lo vencido
--- ============================================================
+
 CREATE OR REPLACE FUNCTION saldo_lote_a_fecha(p_id_lote INT, p_fecha DATE)
 RETURNS NUMERIC(10,2)
 LANGUAGE sql
@@ -21,10 +18,8 @@ AS $$
     AND fecha < p_fecha + 1;
 $$;
 
--- ============================================================
--- FUNCIÓN 2: tasa de aprovechamiento de un período
--- (entregado / donado) * 100, para una unidad de medida
--- ============================================================
+
+
 CREATE OR REPLACE FUNCTION tasa_aprovechamiento(
   p_desde  DATE,
   p_hasta  DATE,
@@ -46,10 +41,7 @@ AS $$
     AND m.fecha <  p_hasta + 1;
 $$;
 
--- ============================================================
--- TRIGGER 1: AUDITORÍA
--- Una sola función que se conecta a varias tablas
--- ============================================================
+
 CREATE OR REPLACE FUNCTION auditar_cambio()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -103,10 +95,7 @@ FOR EACH ROW
 WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
 EXECUTE FUNCTION auditar_cambio('id_lote');
 
--- ============================================================
--- TRIGGER 2: ESTADO DE RESERVA
--- Solo se permite pasar de 'activa' a entregada, cancelada o vencida
--- ============================================================
+
 CREATE OR REPLACE FUNCTION validar_cambio_estado_reserva()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -129,9 +118,6 @@ FOR EACH ROW
 WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
 EXECUTE FUNCTION validar_cambio_estado_reserva();
 
--- ============================================================
--- TRIGGER 3: LOTE VÁLIDO AL RESERVAR
--- ============================================================
 CREATE OR REPLACE FUNCTION validar_lote_en_reserva()
 RETURNS TRIGGER
 LANGUAGE plpgsql

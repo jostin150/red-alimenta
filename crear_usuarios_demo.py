@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 
 from db import consultar, ejecutar
 
-CLAVE_DEMO = "Demo2026!"   # contraseña inventada, solo para la demostración
+CLAVE_DEMO = "Demo2026!"   # contraseña inventada
 
 usuarios = consultar(
     "SELECT id_usuario, correo FROM usuario WHERE correo LIKE %s ORDER BY id_usuario",

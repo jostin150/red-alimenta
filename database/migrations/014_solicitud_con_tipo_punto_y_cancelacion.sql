@@ -1,18 +1,6 @@
--- 014: la solicitud usa TIPO + PUNTO DE ENTREGA, la reserva respeta el tipo,
---      y el beneficiario puede cancelar su propia solicitud.
---
--- Requiere haber ejecutado antes la 013.
--- Ejecutar UNA sola vez, en el Query Tool de la base "alimenta".
---
--- OJO: al terminar esta migración, el formulario "Nueva solicitud" de la
--- aplicación deja de funcionar hasta que cambiemos app.py (paso siguiente).
+
 BEGIN;
 
--- ============================================================
--- 1. crear_solicitud: ahora recibe tipo y punto de entrega
--- La categoría ya no se envía: se deduce del tipo (cada tipo pertenece
--- a una sola categoría), así nadie puede mezclarlas.
--- ============================================================
 DROP PROCEDURE IF EXISTS public.crear_solicitud(INT, INT, INT, NUMERIC, INT);
 
 CREATE OR REPLACE PROCEDURE public.crear_solicitud(
@@ -33,7 +21,7 @@ DECLARE
   v_consentimiento  BOOLEAN;
   v_id_categoria    SMALLINT;
 BEGIN
-  -- 1) Debe ser un beneficiario activo y con consentimiento
+ 
   SELECT b.id_beneficiario, b.estado, b.consentimiento
     INTO v_id_beneficiario, v_estado, v_consentimiento
   FROM beneficiario b
@@ -50,7 +38,6 @@ BEGIN
     RAISE EXCEPTION 'Debes aceptar el tratamiento de tus datos antes de solicitar';
   END IF;
 
-  -- 2) Cantidad, unidad, tipo y punto válidos
   IF p_cantidad IS NULL OR p_cantidad <= 0 THEN
     RAISE EXCEPTION 'La cantidad debe ser mayor que cero';
   END IF;
@@ -72,7 +59,6 @@ BEGIN
     RAISE EXCEPTION 'El punto de entrega % no existe o no está activo', p_id_punto;
   END IF;
 
-  -- 3) Crear la solicitud y su detalle
   INSERT INTO solicitud (id_beneficiario, id_punto)
   VALUES (v_id_beneficiario, p_id_punto)
   RETURNING id_solicitud INTO p_id_solicitud;
@@ -86,11 +72,6 @@ $$;
 REVOKE ALL ON PROCEDURE public.crear_solicitud(INT, INT, INT, NUMERIC, INT, INT) FROM PUBLIC;
 GRANT EXECUTE ON PROCEDURE public.crear_solicitud(INT, INT, INT, NUMERIC, INT, INT) TO alimenta_app;
 
--- ============================================================
--- 2. reservar_inventario: busca lotes del MISMO TIPO (antes, de la misma
---    categoría). Misma firma que antes, así que conserva sus permisos.
---    Solo cambian dos líneas: d.id_tipo y el WHERE de lote.
--- ============================================================
 CREATE OR REPLACE PROCEDURE reservar_inventario(
   p_id_solicitud INT,
   p_id_usuario   INT,
@@ -188,18 +169,9 @@ BEGIN
 END;
 $$;
 
--- CREATE OR REPLACE borra los atributos anteriores del procedimiento, y la
--- migración 009 le había puesto SECURITY DEFINER. Se lo devolvemos; sin esto,
--- la app recibe "no tienes permiso" al reservar.
 ALTER PROCEDURE reservar_inventario(INT, INT, INT)
   SECURITY DEFINER SET search_path = public, pg_temp;
 
--- ============================================================
--- 3. cancelar_solicitud: la cancela el PROPIO beneficiario
---    - Si está "pendiente": solo cambia de estado.
---    - Si está "reservada": además devuelve el inventario a los lotes.
---    - Si ya fue entregada, cancelada o rechazada: no se puede.
--- ============================================================
 CREATE OR REPLACE PROCEDURE public.cancelar_solicitud(
   p_id_solicitud INT,
   p_id_usuario   INT,
@@ -213,7 +185,6 @@ DECLARE
   v_estado     VARCHAR(15);
   v_id_reserva INT;
 BEGIN
-  -- 1) La solicitud debe existir y ser de ESTE usuario (no de otro)
   SELECT s.estado
     INTO v_estado
   FROM solicitud s
@@ -231,7 +202,6 @@ BEGIN
       p_id_solicitud, v_estado;
   END IF;
 
-  -- 2) Si tenía una reserva activa, devolver el inventario
   SELECT id_reserva INTO v_id_reserva
   FROM reserva
   WHERE id_solicitud = p_id_solicitud AND estado = 'activa'
@@ -255,7 +225,6 @@ BEGIN
     UPDATE reserva SET estado = 'cancelada' WHERE id_reserva = v_id_reserva;
   END IF;
 
-  -- 3) Cerrar la solicitud
   UPDATE solicitud
   SET estado = 'cancelada',
       observacion = COALESCE(left(p_motivo, 300), observacion)

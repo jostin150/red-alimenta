@@ -1,4 +1,4 @@
-"""Punto de entrada de la aplicación Red Alimenta Medellín."""
+
 import os
 import secrets
 from datetime import date

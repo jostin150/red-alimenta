@@ -16,7 +16,7 @@ DECLARE
   v_toma        NUMERIC(10,2);
   v_hay_detalle BOOLEAN := FALSE;
 BEGIN
-  -- 1. Bloquear la solicitud y revisar que se pueda reservar
+  --  Bloquear  solicitud y revisar que se pueda reservar
   SELECT s.estado, b.estado
     INTO v_estado_sol, v_estado_ben
   FROM solicitud s
@@ -37,12 +37,12 @@ BEGIN
     RAISE EXCEPTION 'El beneficiario de la solicitud % no está activo', p_id_solicitud;
   END IF;
 
-  -- 2. Crear la reserva
+  --  Crear  reserva
   INSERT INTO reserva (id_solicitud)
   VALUES (p_id_solicitud)
   RETURNING id_reserva INTO p_id_reserva;
 
-  -- 3. Por cada categoría pedida, tomar lotes en orden FEFO
+  
   FOR d IN
     SELECT id_categoria, id_unidad, cantidad_solicitada
     FROM solicitud_detalle
@@ -91,7 +91,7 @@ BEGIN
     RAISE EXCEPTION 'La solicitud % no tiene detalle', p_id_solicitud;
   END IF;
 
-  -- 4. Marcar la solicitud como reservada
+  --  Marcar solicitud como reservada
   UPDATE solicitud SET estado = 'reservada' WHERE id_solicitud = p_id_solicitud;
 END;
 $$;

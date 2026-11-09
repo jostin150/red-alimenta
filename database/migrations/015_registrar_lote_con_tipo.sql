@@ -1,15 +1,6 @@
--- 015: registrar_lote ahora recibe el TIPO de alimento (Agua, Gaseosa, Arroz...).
---      La categoría se deduce del tipo, así no se pueden mezclar.
---
--- Requiere haber ejecutado antes la 013 y la 014.
--- Ejecutar UNA sola vez, en el Query Tool de la base "alimenta".
---
--- OJO: al terminar, el formulario "Registrar lote" de la aplicación falla
--- hasta que reemplaces app.py y lotes.html por los de esta carpeta.
+
 BEGIN;
 
--- Se borra y se vuelve a crear porque cambia el nombre de un parámetro
--- (p_id_categoria -> p_id_tipo) y PostgreSQL no permite hacerlo con REPLACE.
 DROP PROCEDURE IF EXISTS public.registrar_lote(INT, INT, INT, INT, VARCHAR, NUMERIC, DATE, INT);
 
 CREATE PROCEDURE public.registrar_lote(
@@ -29,7 +20,6 @@ AS $$
 DECLARE
   v_id_categoria SMALLINT;
 BEGIN
-  -- 1) Debe ser un usuario activo con un rol autorizado
   IF NOT EXISTS (
     SELECT 1
     FROM usuario u
@@ -42,8 +32,6 @@ BEGIN
     RAISE EXCEPTION 'El usuario % no tiene permiso para registrar lotes', p_id_usuario;
   END IF;
 
-  -- 2) Si NO es gestor ni administrador (o sea, es solo donante),
-  --    la sede debe ser de su propio donante.
   IF NOT EXISTS (
     SELECT 1
     FROM usuario_rol ur
@@ -63,7 +51,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- 3) El tipo debe existir y estar activo; de él sale la categoría
   SELECT id_categoria INTO v_id_categoria
   FROM tipo_alimento
   WHERE id_tipo = p_id_tipo AND activo;

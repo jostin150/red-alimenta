@@ -1,6 +1,4 @@
--- PROCEDURE: public.crear_solicitud(integer, integer, integer, numeric, integer)
 
--- DROP PROCEDURE IF EXISTS public.crear_solicitud(integer, integer, integer, numeric, integer);
 BEGIN;
 
 CREATE OR REPLACE PROCEDURE public.crear_solicitud(
@@ -55,7 +53,6 @@ $BODY$;
 
 GRANT EXECUTE ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) TO alimenta_app;
 
--- (Se quitó el GRANT al rol alimenta_user: ese rol no existe en una instalación nueva.)
 
 REVOKE ALL ON PROCEDURE public.crear_solicitud(integer, integer, integer, numeric, integer) FROM PUBLIC;
 

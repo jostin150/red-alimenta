@@ -1,8 +1,7 @@
 BEGIN;
 
--- ============================================================
--- R1: Inventario disponible y próximo a vencer, por sede y categoría
--- ============================================================
+--  Inventario disponible 
+
 CREATE OR REPLACE VIEW v_reporte_inventario_sede_categoria AS
 SELECT donante, sede, categoria, unidad,
        count(*)                                         AS lotes,
@@ -12,9 +11,7 @@ SELECT donante, sede, categoria, unidad,
 FROM v_inventario_disponible
 GROUP BY donante, sede, categoria, unidad;
 
--- ============================================================
--- R2: Balance mensual (recibido, entregado, cancelado, perdido)
--- ============================================================
+--  Balance  (recibido, entregado, cancelado, perdido)
 CREATE OR REPLACE VIEW v_reporte_balance_mensual AS
 SELECT date_trunc('month', m.fecha)::date AS mes,
        u.abreviatura AS unidad,
@@ -27,11 +24,7 @@ INNER JOIN lote l   ON l.id_lote = m.id_lote
 INNER JOIN unidad u ON u.id_unidad = l.id_unidad
 GROUP BY date_trunc('month', m.fecha)::date, u.abreviatura;
 
--- ============================================================
--- R3: Tasa de aprovechamiento y tiempo medio hasta la entrega
--- Se agrupa por el mes en que LLEGÓ cada lote: de lo que llegó ese mes,
--- cuánto se terminó entregando y cuántos días tardó.
--- ============================================================
+
 CREATE OR REPLACE VIEW v_reporte_aprovechamiento AS
 WITH por_lote AS (
   SELECT l.id_lote,
@@ -64,11 +57,7 @@ FROM por_lote p
 LEFT JOIN tiempos t ON t.mes = p.mes AND t.unidad = p.unidad
 GROUP BY p.mes, p.unidad, t.dias_medios;
 
--- ============================================================
--- R4: Beneficiarios atendidos por comuna (anónimo y agregado)
--- No muestra nombres ni documentos, y oculta comunas con menos de
--- 3 beneficiarios para que nadie pueda ser identificado.
--- ============================================================
+
 CREATE OR REPLACE VIEW v_reporte_beneficiarios_comuna AS
 SELECT COALESCE(b.comuna, 'Sin comuna')       AS comuna,
        count(DISTINCT b.id_beneficiario)      AS beneficiarios_atendidos,
@@ -80,9 +69,7 @@ INNER JOIN beneficiario b  ON b.id_beneficiario = s.id_beneficiario
 GROUP BY 1
 HAVING count(DISTINCT b.id_beneficiario) >= 3;
 
--- ============================================================
--- R5: Donantes con mayor contribución y regularidad
--- ============================================================
+
 CREATE OR REPLACE VIEW v_reporte_donantes AS
 WITH base AS (
   SELECT d.id_donante, d.nombre AS donante,
@@ -109,9 +96,7 @@ FROM base b
 CROSS JOIN meses m
 ORDER BY posicion, b.donante;
 
--- ============================================================
--- R6: Trazabilidad completa de un lote (función con parámetro)
--- ============================================================
+
 CREATE OR REPLACE FUNCTION trazabilidad_lote(p_id_lote INT)
 RETURNS TABLE (
   fecha          TIMESTAMPTZ,

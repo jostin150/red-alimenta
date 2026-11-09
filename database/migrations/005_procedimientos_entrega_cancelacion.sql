@@ -1,8 +1,6 @@
 BEGIN;
 
--- ============================================================
--- CONFIRMAR ENTREGA
--- ============================================================
+
 CREATE OR REPLACE PROCEDURE confirmar_entrega(
   p_id_reserva  INT,
   p_id_usuario  INT,
@@ -16,7 +14,7 @@ DECLARE
   v_id_solicitud INT;
   v_vencidos    INT;
 BEGIN
-  -- 1. Solo un gestor o administrador activo puede confirmar
+  -- n gestor o administrador activo puede confirmar
   IF NOT EXISTS (
     SELECT 1
     FROM usuario u
@@ -29,7 +27,7 @@ BEGIN
     RAISE EXCEPTION 'El usuario % no tiene permiso para confirmar entregas', p_id_usuario;
   END IF;
 
-  -- 2. Bloquear la reserva y revisar su estado
+  --  Bloquear  reserva y revisar su estado
   SELECT estado, id_solicitud
     INTO v_estado_res, v_id_solicitud
   FROM reserva
@@ -45,7 +43,7 @@ BEGIN
       p_id_reserva, v_estado_res;
   END IF;
 
-  -- 3. No se entrega comida vencida
+  -- Ne entrega comida vencida
   SELECT count(*) INTO v_vencidos
   FROM reserva_detalle rd
   JOIN lote l ON l.id_lote = rd.id_lote
@@ -57,12 +55,12 @@ BEGIN
       p_id_reserva, v_vencidos;
   END IF;
 
-  -- 4. Registrar la entrega
+  -- Registrar la entrega
   INSERT INTO entrega (id_reserva, id_usuario_gestor, observacion)
   VALUES (p_id_reserva, p_id_usuario, p_observacion)
   RETURNING id_entrega INTO p_id_entrega;
 
-  -- 5. Una salida por cada lote de la reserva (el saldo ya estaba descontado)
+  
   INSERT INTO movimiento_inventario
     (id_lote, id_reserva, id_usuario, tipo, cantidad, motivo)
   SELECT rd.id_lote, p_id_reserva, p_id_usuario, 'salida', rd.cantidad,
@@ -70,7 +68,7 @@ BEGIN
   FROM reserva_detalle rd
   WHERE rd.id_reserva = p_id_reserva;
 
-  -- 6. Actualizar estados
+  --  Actualizar estados
   UPDATE reserva SET estado = 'entregada' WHERE id_reserva = p_id_reserva;
 
   UPDATE solicitud
@@ -83,9 +81,9 @@ BEGIN
 END;
 $$;
 
--- ============================================================
+
 -- CANCELAR RESERVA
--- ============================================================
+
 CREATE OR REPLACE PROCEDURE cancelar_reserva(
   p_id_reserva INT,
   p_id_usuario INT,
@@ -97,7 +95,7 @@ DECLARE
   v_estado_res   VARCHAR(15);
   v_id_solicitud INT;
 BEGIN
-  -- 1. Solo un gestor o administrador activo puede cancelar
+  --  gestor o administrador  puede cancelar
   IF NOT EXISTS (
     SELECT 1
     FROM usuario u
@@ -110,7 +108,7 @@ BEGIN
     RAISE EXCEPTION 'El usuario % no tiene permiso para cancelar reservas', p_id_usuario;
   END IF;
 
-  -- 2. Bloquear la reserva y revisar su estado
+  --  Bloquear  reserva y revisar su estado
   SELECT estado, id_solicitud
     INTO v_estado_res, v_id_solicitud
   FROM reserva
@@ -126,7 +124,7 @@ BEGIN
       p_id_reserva, v_estado_res;
   END IF;
 
-  -- 3. Devolver el saldo a cada lote
+  --  Devolver  saldo a cada lote
   UPDATE lote l
   SET saldo  = l.saldo + rd.cantidad,
       estado = CASE WHEN l.estado = 'agotado' THEN 'activo' ELSE l.estado END
@@ -134,7 +132,7 @@ BEGIN
   WHERE rd.id_reserva = p_id_reserva
     AND l.id_lote = rd.id_lote;
 
-  -- 4. Anotar una liberación por cada lote
+
   INSERT INTO movimiento_inventario
     (id_lote, id_reserva, id_usuario, tipo, cantidad, motivo)
   SELECT rd.id_lote, p_id_reserva, p_id_usuario, 'liberacion', rd.cantidad,
@@ -142,7 +140,7 @@ BEGIN
   FROM reserva_detalle rd
   WHERE rd.id_reserva = p_id_reserva;
 
-  -- 5. Actualizar estados
+  --  Actualizar estados
   UPDATE reserva SET estado = 'cancelada' WHERE id_reserva = p_id_reserva;
 
   UPDATE solicitud

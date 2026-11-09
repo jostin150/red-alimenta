@@ -1,7 +1,7 @@
 BEGIN;
 
--- ÍNDICES
--- Para escoger rápido los lotes que vencen primero (FiFO)
+
+-- escoger  los lotes que vencen primero 
 CREATE INDEX idx_lote_fefo
   ON lote (id_categoria, fecha_vencimiento)
   WHERE estado = 'activo' AND saldo > 0;
@@ -33,7 +33,7 @@ WHERE l.estado = 'activo'
   AND l.saldo > 0
   AND l.fecha_vencimiento >= CURRENT_DATE;
 
---alertas de vencimiento (próximos 3 días)
+--alertas de vencimiento ( 3 días)
 CREATE VIEW v_alertas_vencimiento AS
 SELECT *
 FROM v_inventario_disponible
@@ -57,7 +57,7 @@ JOIN lote l ON l.id_lote = m.id_lote
 JOIN unidad u ON u.id_unidad = l.id_unidad
 LEFT JOIN usuario us ON us.id_usuario = m.id_usuario;
 
--- indicador mensual (donado, entregado, perdido)
+-- indicador (donado, entregado, perdido)
 CREATE VIEW v_indicador_mensual AS
 SELECT date_trunc('month', m.fecha)::date AS mes,
        u.abreviatura AS unidad,

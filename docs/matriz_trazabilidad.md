@@ -2,7 +2,6 @@
 
 Conecta cada **requerimiento** con lo que lo cumple: las tablas, los objetos de base de datos, la pantalla de la aplicación y la prueba que lo comprueba.
 
-**Cómo usarla:** se lee de izquierda a derecha. Si un profesor pregunta "¿dónde se cumple esto?", la fila indica en qué tabla, procedimiento, pantalla y prueba buscar.
 
 - **RF** = requerimiento funcional (lo que el sistema hace). **RNF** = requerimiento no funcional (cómo lo hace: seguridad, integridad, protección de datos).
 - Las pruebas SQL están en `database/tests/`. Los casos manuales (M-01 a M-14) están en la sección 3.
