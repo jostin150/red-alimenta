@@ -1,15 +1,9 @@
-"""Pone una contraseña de DEMOSTRACIÓN a los usuarios de prueba.
-
-Uso:  python crear_usuarios_demo.py
-
-Solo toca a los usuarios con correo @alimenta.test (los inventados).
-La contraseña se guarda protegida (hash), nunca en texto plano.
-"""
+"
 from werkzeug.security import generate_password_hash
 
 from db import consultar, ejecutar
 
-CLAVE_DEMO = "Demo2026!"   # contraseña inventada
+CLAVE_DEMO = "Demo2026!"   
 
 usuarios = consultar(
     "SELECT id_usuario, correo FROM usuario WHERE correo LIKE %s ORDER BY id_usuario",

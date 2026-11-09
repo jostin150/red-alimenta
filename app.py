@@ -20,8 +20,6 @@ ROLES_DONACION = ("donante", "gestor", "administrador")
 
 app = Flask(__name__)
 
-# La llave secreta firma la sesión. Si alguien la conoce, puede fabricar
-# sesiones falsas, así que NO se deja una por defecto: va en el archivo .env.
 app.secret_key = os.getenv("SECRET_KEY")
 if not app.secret_key:
     raise RuntimeError(
@@ -35,11 +33,6 @@ app.config.update(
 )
 
 
-# ---------------------------------------------------------------------------
-# Protección contra formularios falsos (CSRF)
-# Cada formulario lleva un código secreto que solo conoce esta sesión.
-# Si una página ajena intenta enviar un formulario por ti, no tendrá el código.
-# ---------------------------------------------------------------------------
 def token_csrf():
     if "csrf" not in session:
         session["csrf"] = secrets.token_hex(16)
