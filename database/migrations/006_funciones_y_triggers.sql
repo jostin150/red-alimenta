@@ -1,8 +1,8 @@
 BEGIN;
 
 -- ============================================================
--- FUNCIÓN 1: saldo de un lote en una fecha
--- Suma lo que entró y lo liberado, y resta lo reservado y lo vencido
+--  saldo de un lote en una fecha
+-- Sumar lo que entró y lo liberado, y resta lo reservado y lo vencido
 -- ============================================================
 CREATE OR REPLACE FUNCTION saldo_lote_a_fecha(p_id_lote INT, p_fecha DATE)
 RETURNS NUMERIC(10,2)
